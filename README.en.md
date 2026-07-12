@@ -30,4 +30,4 @@ Run the uninstall BAT included in the corresponding download. The mod does not r
 
 ## Game Resources
 
-Releases do not contain game animations, APK files, account data, or generated mappings. Do not redistribute game resources downloaded by the installer.
+Releases do not contain game animations, APK files, or generated mappings. Do not redistribute game resources downloaded by the installer.
