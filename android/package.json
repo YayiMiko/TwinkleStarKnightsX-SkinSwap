@@ -1,0 +1,16 @@
+{
+  "name": "tskskinswap-android",
+  "version": "0.6.0-beta.1",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && frida-compile src/tskskinswap.ts -o dist/tskskinswap.js -c"
+  },
+  "dependencies": {
+    "frida-il2cpp-bridge": "0.13.1"
+  },
+  "devDependencies": {
+    "@types/frida-gum": "19.8.0",
+    "frida-compile": "19.0.5",
+    "typescript": "5.9.3"
+  }
+}

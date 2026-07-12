@@ -6,6 +6,8 @@
 
 [English](README.en.md)
 
+Android 预发布版请参阅 [Android 使用说明](README.android.md)。Android 版无需 Root，但需要兼容 Mod APK、USB 调试和 Windows 电脑完成首次安装。
+
 ## 使用前准备
 
 - 仅支持 Windows PC 版游戏。

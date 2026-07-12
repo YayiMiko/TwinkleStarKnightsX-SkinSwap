@@ -4,4 +4,7 @@ downloaded/
 src/bin/
 src/obj/
 __pycache__/
+android/node_modules/
+android/dist/
+artifacts/
 *.log

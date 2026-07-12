@@ -14,8 +14,8 @@ from pathlib import Path
 
 try:
     import UnityPy
-except ImportError as exc:  # pragma: no cover - exercised by the launcher
-    raise SystemExit("UnityPy is required: python -m pip install UnityPy") from exc
+except ImportError:  # Android catalog discovery does not inspect bundle contents.
+    UnityPy = None
 
 
 TRANSFORM_TARGET_RE = re.compile(
@@ -144,7 +144,12 @@ def catalog_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def discover_targets(catalog_path: Path, quality: str, edition: str) -> tuple[str, list[BundleTarget]]:
+def discover_targets(
+    catalog_path: Path,
+    quality: str,
+    edition: str,
+    require_cutins: bool = True,
+) -> tuple[str, list[BundleTarget]]:
     with catalog_path.open("r", encoding="utf-8-sig") as stream:
         catalog = json.load(stream)
 
@@ -213,6 +218,8 @@ def discover_targets(catalog_path: Path, quality: str, edition: str) -> tuple[st
     missing_cutins: list[str] = []
     for character_id, transform in sorted(transforms.items()):
         targets.append(transform)
+        if not require_cutins:
+            continue
         cutin = cutins.get((character_id, edition))
         if cutin is None and edition == "adult":
             cutin = cutins.get((character_id, "general"))
@@ -226,6 +233,8 @@ def discover_targets(catalog_path: Path, quality: str, edition: str) -> tuple[st
 
 
 def contains_asset(path: Path, asset_path: str) -> bool:
+    if UnityPy is None:
+        raise RuntimeError("UnityPy is required to inspect bundle contents")
     environment = UnityPy.load(path.read_bytes())
     return any(str(container_path) == asset_path for container_path in environment.container)
 
