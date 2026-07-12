@@ -1,6 +1,6 @@
 # TskSkinSwap
 
-TskSkinSwap is a Live2D normal-attack animation replacement mod for Twinkle Star Knights X. It redirects a normal-attack `bc_<id>` SkeletonData request to the complete high-quality `tf_<id>_m0` transformation SkeletonData, including its mesh attachments, skin, atlas, and materials.
+TskSkinSwap is an R18 animation replacement mod for the PC version of Twinkle Star Knights X. It replaces each supported character's Normal Attack 2 animation with that character's high-quality R18 transformation animation.
 
 [简体中文](README.md)
 
@@ -11,7 +11,7 @@ TskSkinSwap is a Live2D normal-attack animation replacement mod for Twinkle Star
 3. Start the game once after an update so Addressables refreshes its catalog, then close it.
 4. Double-click `Apply-TskSkinSwap.bat`.
 
-The first run downloads isolated copies of Python, UnityPy, the .NET 6 SDK, and BepInEx from their official sources. It then reads the installed client's current Addressables catalog and downloads the high-quality adult transformation and matching Cutin bundles required by the mod.
+The first run downloads isolated copies of Python, UnityPy, the .NET 6 SDK, and BepInEx from their official sources. It then reads the installed client's current Addressables catalog and downloads the high-quality R18 transformation and matching Cutin bundles required by the mod.
 
 Adult Cutin is preferred when available; otherwise the downloader selects the matching high-quality general Cutin. The July 2026 catalog requires about 2.0 GiB of game bundles, so allow at least 2.1 GB of free disk space.
 
