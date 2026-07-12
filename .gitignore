@@ -1,0 +1,7 @@
+.tools/
+generated/
+downloaded/
+src/bin/
+src/obj/
+__pycache__/
+*.log
