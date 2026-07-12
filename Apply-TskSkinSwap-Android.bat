@@ -2,7 +2,7 @@
 setlocal
 chcp 65001 >nul
 
-echo 闪耀星骑士 Android 通常攻击 2 成人变身动画替换 MOD
+echo 闪耀星骑士 Android 通常攻击演出成人变身动画替换 MOD
 echo.
 echo 请连接手机，并确认已经允许 USB 调试。
 echo.

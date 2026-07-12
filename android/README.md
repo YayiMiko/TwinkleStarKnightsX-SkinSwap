@@ -32,6 +32,6 @@ Runtime configuration is read from `<persistentDataPath>/tskskinswap/mappings.js
 
 The runtime observes `EffectCutinManager.LoadCutin` to preload only the transform assets needed by the active Cutin view. When `SetNormalCutin` runs, it replaces that manager's `cutinData` entry with the prepared transform `SkeletonDataAsset`. Do not patch `SkeletonDataAsset.GetSkeletonData`: those assets are shared with the home screen and global mutation corrupts unrelated Spine views.
 
-The current MVP is verified for Normal Attack 2 in battle and in the non-battle animation preview. Returning to the home screen and entering a second battle do not retain the replacement outside the Cutin manager.
+The current runtime replaces the Cutin used by both Normal Attack 1 and Normal Attack 2 in battle and in the non-battle animation preview. Returning to the home screen and entering a second battle do not retain the replacement outside the Cutin manager. A future optional mode may restrict replacement to Normal Attack 2 only.
 
 APK files, signing tools, extracted game content, generated scripts, mappings, and downloaded bundles must remain untracked.
