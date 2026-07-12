@@ -10,7 +10,7 @@
 
 适用于 Windows PC 版游戏，提供一键安装、更新和卸载。
 
-[下载 PC 版 Release 1.0](https://github.com/YayiMiko/TwinkleStarKnightsX-SkinSwap/releases/tag/pc-v1.0.0)
+[下载 PC 版 Release 1.0](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/pc-v1.0.0)
 
 1. 下载 `TskSkinSwap-PC-v1.0.0.zip` 并完整解压。
 2. 将解压出的 `TskSkinSwap` 文件夹放入游戏目录的 `mods` 文件夹。
@@ -23,7 +23,7 @@
 
 适用于 Android 版游戏，无需 Root。首次安装需要 Windows 电脑、USB 数据线、USB 调试和兼容 Mod APK。安卓版安装包请前往 [anosu/DMM-Mod](https://github.com/anosu/DMM-Mod) 获取。
 
-[下载 Android 版 Release 0.1](https://github.com/YayiMiko/TwinkleStarKnightsX-SkinSwap/releases/tag/android-v0.1.0)
+[下载 Android 版 Release 0.1](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.1.0)
 
 1. 下载 `TskSkinSwap-Android-v0.1.0.zip` 并完整解压。
 2. 手机连接电脑并允许 USB 调试。
