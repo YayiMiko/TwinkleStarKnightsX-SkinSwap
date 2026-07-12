@@ -171,7 +171,7 @@ def main() -> int:
     )
     if gadget_ready != "READY":
         raise RuntimeError(
-            "The installed APK does not expose the Frida script directory; install the compatible Mod APK first."
+            "The installed app is not a compatible Android package (APK); install the compatible Android package (APK) first."
         )
 
     output_root = args.output_dir.resolve()

@@ -2,7 +2,7 @@
 
 ## User Installation
 
-The current installer targets the compatible `jp.co.fanzagames.twinklestarknightsx_a_mod` APK with Frida Gadget `script-directory` support. Root access is not required. Enable USB debugging, connect and authorize the phone, then double-click:
+The current installer targets the compatible Android package (APK) named `jp.co.fanzagames.twinklestarknightsx_a_mod`, with Frida Gadget `script-directory` support. Root access is not required. Enable USB debugging, connect and authorize the phone, then double-click:
 
 ```text
 Apply-TskSkinSwap-Android.bat

@@ -19,7 +19,7 @@ To upgrade from PC 1.0, you do not need to uninstall it. Close the game, replace
 
 ## Android Release 0.1
 
-Android does not require root, but the first installation requires a Windows PC, USB debugging, a USB cable, and a compatible modded APK.
+Android does not require root, but the first installation requires a Windows PC, USB debugging, a USB cable, and a compatible Android package (APK).
 
 Known compatibility issue: some users report that the Android edition does not work on certain Xiaomi phones. The cause is still under investigation, and Xiaomi compatibility is not currently guaranteed.
 
@@ -36,4 +36,4 @@ Run the uninstall BAT included in the corresponding download. The mod does not r
 
 ## Game Resources
 
-Releases do not contain game animations, APK files, or generated mappings. Do not redistribute game resources downloaded by the installer.
+Releases do not contain game animations, compatible Android packages (APK), or generated mappings. Do not redistribute game resources downloaded by the installer.

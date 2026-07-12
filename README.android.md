@@ -6,13 +6,13 @@
 
 ## 已知兼容性问题
 
-目前有用户反馈部分小米手机无法使用，原因仍在调查，暂不保证兼容。其他品牌也可能因系统版本或兼容 Mod APK 不同而存在差异。
+目前有用户反馈部分小米手机无法使用，原因仍在调查，暂不保证兼容。其他品牌也可能因系统版本或安卓版兼容安装包不同而存在差异。
 
 ## 使用条件
 
 - Windows 电脑和 USB 数据线。
 - 手机已开启 USB 调试并允许当前电脑连接，无需 Root。
-- 已安装兼容的 Mod APK，包名为 `jp.co.fanzagames.twinklestarknightsx_a_mod`。安卓版安装包请前往 [anosu/DMM-Mod](https://github.com/anosu/DMM-Mod) 获取。
+- 已安装安卓版兼容安装包（APK），包名为 `jp.co.fanzagames.twinklestarknightsx_a_mod`。请前往 [anosu/DMM-Mod](https://github.com/anosu/DMM-Mod) 获取该安装包。
 - 首次安装需要联网。实际下载量取决于手机已有缓存；2026 年 7 月测试约需 0.66 GiB。
 
 ## 开启 USB 调试
@@ -53,9 +53,9 @@
 
 确认 USB 调试已开启、手机保持解锁，并在手机上允许这台电脑进行调试。更换 USB 连接模式或数据线后重试。
 
-### 提示 APK 不兼容
+### 提示安卓版兼容安装包不兼容
 
-当前版本不会自动修改原版 APK。请先前往 [anosu/DMM-Mod](https://github.com/anosu/DMM-Mod) 获取并安装安卓版兼容安装包。
+当前版本不会自动将原版安装包改为兼容版本。请先前往 [anosu/DMM-Mod](https://github.com/anosu/DMM-Mod) 获取并安装安卓版兼容安装包。
 
 ### 下载中断
 
@@ -63,4 +63,4 @@
 
 ## 资源说明
 
-Release 不包含 APK 或游戏动画。所需资源会根据当前游戏版本下载并保存在用户自己的电脑和手机上，请勿重新分发。
+Release 不包含安卓版兼容安装包或游戏动画。所需资源会根据当前游戏版本下载并保存在用户自己的电脑和手机上，请勿重新分发。
