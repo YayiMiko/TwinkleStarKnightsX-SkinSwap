@@ -4,14 +4,16 @@ This mod replaces Normal Attack 2 with each supported character's high-quality R
 
 [简体中文](README.md)
 
-## PC Release 1.0
+## PC Release 1.1
 
-1. Download `TskSkinSwap-PC-v1.0.0.zip` from [PC Release 1.0](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/pc-v1.0.0).
+1. Download `TskSkinSwap-PC-v1.1.0.zip` from [PC Release 1.1](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/pc-v1.1.0).
 2. Extract `TskSkinSwap` to `<game>/mods/TskSkinSwap/`.
 3. Close the game and double-click `Apply-TskSkinSwap.bat`.
 4. Start the game after `Completed successfully` appears.
 
 The first installation downloads about 2 GB. Run the BAT again after a game update.
+
+To upgrade from PC 1.0, you do not need to uninstall it. Close the game, replace the old `TskSkinSwap` folder with the fully extracted 1.1 folder, and run the new `Apply-TskSkinSwap.bat`. Existing valid downloads will be reused.
 
 ## Android Release 0.1
 

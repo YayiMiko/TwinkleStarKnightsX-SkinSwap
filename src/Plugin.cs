@@ -14,7 +14,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "com.codex.tskskinswap";
     public const string PluginName = "TSK Skin Swap";
-    public const string PluginVersion = "1.0.0";
+    public const string PluginVersion = "1.1.0";
 
     internal static ManualLogSource PluginLog { get; private set; } = null!;
 
@@ -31,7 +31,10 @@ public sealed class Plugin : BasePlugin
 
         try
         {
+            Harmony.CreateAndPatchAll(typeof(NormalCutinRequestPatch), PluginGuid);
             Harmony.CreateAndPatchAll(typeof(SkeletonDataPatch), PluginGuid);
+            Harmony.CreateAndPatchAll(typeof(AnimationStateDataPatch), PluginGuid);
+            Harmony.CreateAndPatchAll(typeof(SkeletonGraphicInitializePatch), PluginGuid);
             Log.LogInfo($"Loaded {SkinSwapRuntime.MappingCount} enabled character mapping(s).");
             RuntimeFileLog.Write($"Harmony installed; mappings={SkinSwapRuntime.MappingCount}.");
             if (Environment.GetEnvironmentVariable("TSK_SKIN_SWAP_SELF_TEST") == "1")
@@ -47,21 +50,58 @@ public sealed class Plugin : BasePlugin
     }
 }
 
+[HarmonyPatch(typeof(EffectCutinManager), nameof(EffectCutinManager.SetNormalCutin))]
+internal static class NormalCutinRequestPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(EffectCutinManager __instance, int id)
+    {
+        SkinSwapRuntime.RegisterNormalCutin(__instance, id);
+    }
+}
+
 [HarmonyPatch(typeof(SkeletonDataAsset), nameof(SkeletonDataAsset.GetSkeletonData))]
 internal static class SkeletonDataPatch
 {
     [HarmonyPrefix]
-    private static void Prefix(SkeletonDataAsset __instance)
+    private static bool Prefix(SkeletonDataAsset __instance, ref Spine.SkeletonData __result)
     {
-        SkinSwapRuntime.TryApply(__instance);
+        return !SkinSwapRuntime.TryGetSkeletonData(__instance, out __result);
+    }
+}
+
+[HarmonyPatch(typeof(SkeletonDataAsset), nameof(SkeletonDataAsset.GetAnimationStateData))]
+internal static class AnimationStateDataPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(SkeletonDataAsset __instance, ref Spine.AnimationStateData __result)
+    {
+        return !SkinSwapRuntime.TryGetAnimationStateData(__instance, out __result);
+    }
+}
+
+[HarmonyPatch(typeof(SkeletonGraphic), nameof(SkeletonGraphic.Initialize), new[] { typeof(bool) })]
+internal static class SkeletonGraphicInitializePatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(SkeletonGraphic __instance)
+    {
+        SkinSwapRuntime.CompleteNormalCutin(__instance.skeletonDataAsset);
+    }
+
+    [HarmonyFinalizer]
+    private static Exception? Finalizer(Exception? __exception, SkeletonGraphic __instance)
+    {
+        SkinSwapRuntime.CompleteNormalCutin(__instance.skeletonDataAsset);
+        return __exception;
     }
 }
 
 internal static class SkinSwapRuntime
 {
     private static readonly Dictionary<string, CharacterMapping> Mappings = new(StringComparer.Ordinal);
-    private static readonly HashSet<int> AppliedAssets = new();
-    private static readonly Dictionary<string, AssetBundle> LoadedBundles = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, PreparedTransform> PreparedTransforms = new(StringComparer.Ordinal);
+    private static readonly Dictionary<int, OverrideRequest> ActiveOverrides = new();
     private static readonly List<UnityEngine.Object> RuntimeObjects = new();
     private static readonly List<Spine.Animation> RuntimeAnimations = new();
     private static readonly object Gate = new();
@@ -136,37 +176,27 @@ internal static class SkinSwapRuntime
 
     private static bool RunSelfTest(CharacterMapping mapping)
     {
-        AssetBundle? cutinBundle = null;
         try
         {
-            cutinBundle = AssetBundle.LoadFromFile(mapping.CutinBundle);
-            if (cutinBundle is null)
-            {
-                throw new InvalidOperationException($"Unable to load cutin bundle: {mapping.CutinBundle}");
-            }
-
-            var skeletonPath = mapping.CutinAtlasAsset.Replace(".atlas.txt", "_SkeletonData.asset", StringComparison.Ordinal);
-            var skeletonObject = cutinBundle.LoadAsset(skeletonPath);
-            if (skeletonObject is null)
-            {
-                throw new InvalidOperationException($"Unable to load cutin skeleton: {skeletonPath}");
-            }
-
-            var skeletonAsset = new SkeletonDataAsset(skeletonObject.Pointer);
-            var skeletonData = skeletonAsset.GetSkeletonData(false);
-            if (skeletonData is null)
-            {
-                throw new InvalidOperationException("Patched skeleton data is null.");
-            }
-
-            var animations = skeletonData.Animations;
+            var prepared = PrepareTransform(mapping);
+            var animations = prepared.Data.Animations;
             var animationNames = new List<string>();
             for (var index = 0; index < animations.Count; index++)
             {
                 animationNames.Add(animations.Items[index].Name);
             }
             RuntimeFileLog.Write($"ANIMATIONS character={mapping.CharacterId} names={string.Join(",", animationNames)}");
-            RuntimeFileLog.Write($"SELF_TEST_OK character={mapping.CharacterId} asset={skeletonAsset.name}");
+            if (prepared.StateData is null)
+            {
+                throw new InvalidOperationException("Transform AnimationStateData is null.");
+            }
+
+            if (prepared.Asset.atlasAssets is null || prepared.Asset.atlasAssets.Length == 0)
+            {
+                throw new InvalidOperationException("Transform atlas assets are missing.");
+            }
+
+            RuntimeFileLog.Write($"SELF_TEST_OK character={mapping.CharacterId} asset={prepared.Asset.name}");
             return true;
         }
         catch (Exception exception)
@@ -174,90 +204,118 @@ internal static class SkinSwapRuntime
             RuntimeFileLog.Write($"SELF_TEST_FAILED character={mapping.CharacterId}: {exception}");
             return false;
         }
-        finally
+    }
+
+    internal static void RegisterNormalCutin(EffectCutinManager manager, int id)
+    {
+        if (manager is null)
         {
-            cutinBundle?.Unload(false);
+            return;
+        }
+
+        var characterId = id.ToString();
+        if (!Mappings.TryGetValue(characterId, out var mapping))
+        {
+            return;
+        }
+
+        lock (Gate)
+        {
+            try
+            {
+                RemoveExpiredOverrides();
+                if (manager.cutinData is null || !manager.cutinData.ContainsKey(characterId))
+                {
+                    throw new InvalidOperationException($"Normal Cutin asset is not loaded for character {characterId}.");
+                }
+
+                var sourceAsset = manager.cutinData[characterId];
+                var prepared = PrepareTransform(mapping);
+                var request = new OverrideRequest(sourceAsset, prepared, DateTimeOffset.UtcNow.AddSeconds(10));
+                var instanceId = sourceAsset.GetInstanceID();
+                if (ActiveOverrides.TryGetValue(instanceId, out var previous))
+                {
+                    previous.RestoreTemporaryFields(sourceAsset);
+                }
+
+                ActiveOverrides[instanceId] = request;
+                RuntimeFileLog.Write($"OVERRIDE_REGISTERED character={characterId} asset={sourceAsset.name} instance={sourceAsset.GetInstanceID()}");
+            }
+            catch (Exception exception)
+            {
+                Plugin.PluginLog.LogError($"Failed to register Cutin override for character {characterId}: {exception}");
+                RuntimeFileLog.Write($"OVERRIDE_REGISTER_FAILED character={characterId}: {exception}");
+            }
         }
     }
 
-    internal static void TryApply(SkeletonDataAsset asset)
+    internal static bool TryGetSkeletonData(SkeletonDataAsset asset, out Spine.SkeletonData result)
+    {
+        result = null!;
+        if (asset is null)
+        {
+            return false;
+        }
+
+        lock (Gate)
+        {
+            RemoveExpiredOverrides();
+            if (!ActiveOverrides.TryGetValue(asset.GetInstanceID(), out var request))
+            {
+                return false;
+            }
+
+            request.ApplyTemporaryFields(asset);
+            request.SkeletonDataServed = true;
+            result = request.Prepared.Data;
+            RuntimeFileLog.Write($"OVERRIDE_SKELETON character={request.CharacterId} asset={asset.name}");
+            return true;
+        }
+    }
+
+    internal static bool TryGetAnimationStateData(SkeletonDataAsset asset, out Spine.AnimationStateData result)
+    {
+        result = null!;
+        if (asset is null)
+        {
+            return false;
+        }
+
+        lock (Gate)
+        {
+            RemoveExpiredOverrides();
+            if (!ActiveOverrides.TryGetValue(asset.GetInstanceID(), out var request))
+            {
+                return false;
+            }
+
+            request.AnimationStateServed = true;
+            result = request.Prepared.StateData;
+            RuntimeFileLog.Write($"OVERRIDE_STATE character={request.CharacterId} asset={asset.name}");
+            return true;
+        }
+    }
+
+    internal static void CompleteNormalCutin(SkeletonDataAsset asset)
     {
         if (asset is null)
         {
             return;
         }
 
-        var assetName = asset.name;
-        if (!TryGetCharacterId(assetName, out var characterId)
-            || !Mappings.TryGetValue(characterId, out var mapping))
-        {
-            return;
-        }
-
-        var instanceId = asset.GetInstanceID();
         lock (Gate)
         {
-            if (AppliedAssets.Contains(instanceId))
+            RemoveExpiredOverrides();
+            var instanceId = asset.GetInstanceID();
+            if (!ActiveOverrides.TryGetValue(instanceId, out var request))
             {
                 return;
             }
 
-            try
-            {
-                ApplyMapping(asset, mapping);
-                AppliedAssets.Add(instanceId);
-                Plugin.PluginLog.LogInfo($"Applied full tf_m0 skeleton to {assetName}.");
-                RuntimeFileLog.Write($"Applied full tf_m0 skeleton to {assetName}.");
-            }
-            catch (Exception exception)
-            {
-                AppliedAssets.Add(instanceId);
-                Plugin.PluginLog.LogError($"Failed to patch {assetName}: {exception}");
-                RuntimeFileLog.Write($"Failed to patch {assetName}: {exception}");
-            }
+            request.RestoreTemporaryFields(asset);
+            ActiveOverrides.Remove(instanceId);
+            RuntimeFileLog.Write($"OVERRIDE_COMPLETED character={request.CharacterId} skeleton={request.SkeletonDataServed} state={request.AnimationStateServed}");
         }
-    }
-
-    private static bool TryGetCharacterId(string? assetName, out string characterId)
-    {
-        characterId = string.Empty;
-        if (string.IsNullOrEmpty(assetName)
-            || !assetName.StartsWith("bc_", StringComparison.Ordinal)
-            || !assetName.EndsWith("_SkeletonData", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var start = 3;
-        var length = assetName.Length - start - "_SkeletonData".Length;
-        if (length <= 0)
-        {
-            return false;
-        }
-
-        characterId = assetName.Substring(start, length);
-        return characterId.All(char.IsDigit);
-    }
-
-    private static void ApplyMapping(SkeletonDataAsset asset, CharacterMapping mapping)
-    {
-        var bundle = LoadBundle(mapping.TransformBundle);
-        var skeletonObject = bundle.LoadAsset(mapping.TransformSkeletonAsset);
-        if (skeletonObject is null)
-        {
-            throw new InvalidOperationException($"Transform skeleton was not found: {mapping.TransformSkeletonAsset}");
-        }
-
-        var transformAsset = new SkeletonDataAsset(skeletonObject.Pointer);
-        var transformData = transformAsset.GetSkeletonData(false);
-        if (transformData is null)
-        {
-            throw new InvalidOperationException($"Transform SkeletonData could not be parsed: {mapping.TransformSkeletonAsset}");
-        }
-
-        EnsureCutAnimationAliases(transformData, mapping.CharacterId);
-        asset.InitializeWithData(transformData);
-        RuntimeObjects.Add(transformAsset);
     }
 
     private static void EnsureCutAnimationAliases(Spine.SkeletonData skeletonData, string characterId)
@@ -293,23 +351,173 @@ internal static class SkinSwapRuntime
         }
     }
 
-    private static AssetBundle LoadBundle(string path)
+    private static PreparedTransform PrepareTransform(CharacterMapping mapping)
     {
-        if (LoadedBundles.TryGetValue(path, out var existing) && existing is not null)
+        if (PreparedTransforms.TryGetValue(mapping.CharacterId, out var existing))
         {
             return existing;
         }
 
-        var bundle = AssetBundle.LoadFromFile(path);
-        if (bundle is null)
+        var (bundle, owned) = OpenTransformBundle(mapping);
+        try
         {
-            throw new InvalidOperationException($"Unable to load transform bundle: {path}");
-        }
+            var skeletonObject = bundle.LoadAsset(mapping.TransformSkeletonAsset);
+            if (skeletonObject is null)
+            {
+                throw new InvalidOperationException($"Transform skeleton was not found: {mapping.TransformSkeletonAsset}");
+            }
 
-        LoadedBundles[path] = bundle;
-        return bundle;
+            var transformAsset = new SkeletonDataAsset(skeletonObject.Pointer);
+            var transformData = transformAsset.GetSkeletonData(false);
+            if (transformData is null)
+            {
+                throw new InvalidOperationException($"Transform SkeletonData could not be parsed: {mapping.TransformSkeletonAsset}");
+            }
+
+            EnsureCutAnimationAliases(transformData, mapping.CharacterId);
+            var stateData = transformAsset.GetAnimationStateData();
+            if (stateData is null)
+            {
+                throw new InvalidOperationException($"Transform AnimationStateData could not be created: {mapping.TransformSkeletonAsset}");
+            }
+
+            var prepared = new PreparedTransform(mapping.CharacterId, transformAsset, transformData, stateData, !owned);
+            if (owned)
+            {
+                PreparedTransforms[mapping.CharacterId] = prepared;
+                RuntimeObjects.Add(transformAsset);
+            }
+            RuntimeFileLog.Write($"TRANSFORM_PREPARED character={mapping.CharacterId} source={(owned ? "mod" : "game")}");
+            return prepared;
+        }
+        finally
+        {
+            if (owned)
+            {
+                bundle.Unload(false);
+                RuntimeFileLog.Write($"TRANSFORM_BUNDLE_RELEASED character={mapping.CharacterId}");
+            }
+        }
     }
 
+    private static (AssetBundle Bundle, bool Owned) OpenTransformBundle(CharacterMapping mapping)
+    {
+        var loaded = FindLoadedBundle(mapping.TransformSkeletonAsset);
+        if (loaded is not null)
+        {
+            return (loaded, false);
+        }
+
+        var bundle = AssetBundle.LoadFromFile(mapping.TransformBundle);
+        if (bundle is not null)
+        {
+            return (bundle, true);
+        }
+
+        loaded = FindLoadedBundle(mapping.TransformSkeletonAsset);
+        if (loaded is not null)
+        {
+            return (loaded, false);
+        }
+
+        throw new InvalidOperationException($"Unable to open transform bundle: {mapping.TransformBundle}");
+    }
+
+    private static AssetBundle? FindLoadedBundle(string assetPath)
+    {
+        var bundles = AssetBundle.GetAllLoadedAssetBundles_Native();
+        for (var index = 0; index < bundles.Length; index++)
+        {
+            var bundle = bundles[index];
+            if (bundle is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (bundle.Contains(assetPath))
+                {
+                    return bundle;
+                }
+            }
+            catch
+            {
+                // A bundle can disappear while Unity is changing scenes.
+            }
+        }
+
+        return null;
+    }
+
+    private static void RemoveExpiredOverrides()
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var instanceId in ActiveOverrides
+                     .Where(item => item.Value.ExpiresAt <= now)
+                     .Select(item => item.Key)
+                     .ToArray())
+        {
+            var request = ActiveOverrides[instanceId];
+            request.RestoreTemporaryFields(request.SourceAsset);
+            ActiveOverrides.Remove(instanceId);
+            RuntimeFileLog.Write($"OVERRIDE_EXPIRED character={request.CharacterId} skeleton={request.SkeletonDataServed} state={request.AnimationStateServed}");
+        }
+    }
+
+    private sealed record PreparedTransform(
+        string CharacterId,
+        SkeletonDataAsset Asset,
+        Spine.SkeletonData Data,
+        Spine.AnimationStateData StateData,
+        bool Borrowed);
+
+    private sealed class OverrideRequest
+    {
+        internal OverrideRequest(SkeletonDataAsset sourceAsset, PreparedTransform prepared, DateTimeOffset expiresAt)
+        {
+            SourceAsset = sourceAsset;
+            Prepared = prepared;
+            ExpiresAt = expiresAt;
+        }
+
+        internal string CharacterId => Prepared.CharacterId;
+        internal SkeletonDataAsset SourceAsset { get; }
+        internal PreparedTransform Prepared { get; }
+        internal DateTimeOffset ExpiresAt { get; }
+        internal bool SkeletonDataServed { get; set; }
+        internal bool AnimationStateServed { get; set; }
+
+        private Spine.SkeletonData? OriginalSkeletonData { get; set; }
+        private Spine.AnimationStateData? OriginalStateData { get; set; }
+        private bool TemporaryFieldsApplied { get; set; }
+
+        internal void ApplyTemporaryFields(SkeletonDataAsset asset)
+        {
+            if (TemporaryFieldsApplied)
+            {
+                return;
+            }
+
+            OriginalSkeletonData = asset.skeletonData;
+            OriginalStateData = asset.stateData;
+            asset.skeletonData = Prepared.Data;
+            asset.stateData = Prepared.StateData;
+            TemporaryFieldsApplied = true;
+        }
+
+        internal void RestoreTemporaryFields(SkeletonDataAsset asset)
+        {
+            if (!TemporaryFieldsApplied)
+            {
+                return;
+            }
+
+            asset.skeletonData = OriginalSkeletonData;
+            asset.stateData = OriginalStateData;
+            TemporaryFieldsApplied = false;
+        }
+    }
 }
 
 internal sealed class MappingDocument
