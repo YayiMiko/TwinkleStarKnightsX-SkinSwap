@@ -13,9 +13,10 @@
 [下载 PC 版 Release 1.0](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/pc-v1.0.0)
 
 1. 下载 `TskSkinSwap-PC-v1.0.0.zip` 并完整解压。
-2. 将解压出的 `TskSkinSwap` 文件夹放入游戏目录的 `mods` 文件夹。
-3. 完全关闭游戏，双击 `Apply-TskSkinSwap.bat`。
-4. 显示 `Completed successfully` 后启动游戏。
+2. 如果游戏目录下没有 `mods` 文件夹，请自行新建一个。
+3. 将解压出的 `TskSkinSwap` 文件夹放到 `<游戏目录>\mods\TskSkinSwap\`。
+4. 完全关闭游戏，进入该 `TskSkinSwap` 文件夹，双击里面的 `Apply-TskSkinSwap.bat`。
+5. 显示 `Completed successfully` 后启动游戏。
 
 首次安装约需下载 2 GB。详细说明见 [PC 版使用说明](README.pc.md)。
 
@@ -26,9 +27,11 @@
 [下载 Android 版 Release 0.1](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.1.0)
 
 1. 下载 `TskSkinSwap-Android-v0.1.0.zip` 并完整解压。
-2. 手机连接电脑并允许 USB 调试。
-3. 双击 `Apply-TskSkinSwap-Android.bat`。
-4. 等待工具安装完成并自动重启游戏。
+2. 在手机的“关于手机 → 版本信息”中连续点击“软件版本号”约 7 次，开启开发者模式。
+3. 返回“系统管理与升级”（部分手机叫“更多设置”），进入“开发者选项”并开启“USB 调试”。
+4. 手机连接电脑、保持解锁，并在手机弹窗中允许这台电脑进行 USB 调试。
+5. 在电脑上打开刚才解压的文件夹，双击里面的 `Apply-TskSkinSwap-Android.bat`。
+6. 等待工具安装完成并自动重启游戏。
 
 实际下载量取决于手机已有缓存。详细说明见 [Android 版使用说明](README.android.md)。
 

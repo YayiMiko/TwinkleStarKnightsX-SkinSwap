@@ -11,14 +11,15 @@
 ## 安装
 
 1. 完整解压 `TskSkinSwap-PC-v1.0.0.zip`。
-2. 将 `TskSkinSwap` 文件夹放入：
+2. 打开游戏目录。如果其中没有 `mods` 文件夹，请自行新建一个。
+3. 将解压出的 `TskSkinSwap` 文件夹放入：
 
    ```text
    <游戏目录>\mods\TskSkinSwap\
    ```
 
-3. 双击 `Apply-TskSkinSwap.bat`。
-4. 等待窗口显示 `Completed successfully`，然后启动游戏。
+4. 进入 `<游戏目录>\mods\TskSkinSwap\`，双击该文件夹里的 `Apply-TskSkinSwap.bat`。
+5. 等待窗口显示 `Completed successfully`，然后启动游戏。
 
 首次运行会自动准备运行组件和动画资源。以后正常启动游戏即可，无需每次运行安装工具。
 
