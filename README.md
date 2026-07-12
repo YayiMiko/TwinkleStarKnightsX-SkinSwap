@@ -1,36 +1,64 @@
 # TskSkinSwap
 
-适用于《ティンクルスターナイツX》的 Live2D 通常攻击动画替换 MOD。工具会在通常攻击 2 请求 `bc_<角色ID>` 骨骼时，改用对应变身演出的完整高画质 `tf_<角色ID>_m0` SkeletonData，包括骨骼、网格附件、skin、atlas 和材质。
+这是一个适用于 PC 版《ティンクルスターナイツX》的动画替换 MOD。
+
+安装后，角色在战斗中使用“通常攻击 2”时，会播放该角色的高画质成人版变身动画。支持的角色会自动匹配，无需在游戏中逐个打开变身界面下载资源。
 
 [English](README.en.md)
 
-## 一键安装
+## 使用前准备
 
-1. 从 [Releases](https://github.com/YayiMiko/TskSkinSwap/releases) 下载 `TskSkinSwap-v0.5.0.zip`。
-2. 将压缩包内的 `TskSkinSwap` 文件夹放到：
+- 仅支持 Windows PC 版游戏。
+- 首次安装需要联网，并预留至少 2.1 GB 磁盘空间。
+- 操作前必须完全关闭游戏。
+- 游戏更新后，需要先正常启动并进入一次游戏，让客户端更新资源目录，然后再关闭游戏运行本工具。
+
+## 安装方法
+
+1. 打开 [Releases](https://github.com/YayiMiko/TskSkinSwap/releases)，下载最新的 `TskSkinSwap-版本号.zip`。
+2. 解压后，将整个 `TskSkinSwap` 文件夹放入游戏目录下的 `mods` 文件夹：
 
    ```text
    <游戏目录>\mods\TskSkinSwap\
    ```
 
-3. 游戏更新后先正常启动一次，以刷新 Addressables 目录，然后关闭游戏。
-4. 双击 `Apply-TskSkinSwap.bat`。
-5. 显示 `Completed successfully` 后即可启动游戏。
+3. 双击 `Apply-TskSkinSwap.bat`。
+4. 首次运行会自动下载运行组件和角色动画资源，请耐心等待。
+5. 窗口显示 `Completed successfully` 后，关闭窗口并启动游戏。
 
-首次运行会从官方来源安装隔离的 Python、UnityPy、.NET SDK 和 BepInEx。随后脚本读取当前客户端的 Addressables 目录，并从游戏官方 CDN 下载 MOD 所需的高画质成人版变身包和对应 Cutin 包，无需逐个打开角色界面。
+以后正常启动游戏即可，不需要每次运行安装脚本。
 
-成人版 Cutin 不存在时会自动回退到同 ID 的高画质 `general` Cutin。2026 年 7 月的资源目录约需下载 2.0 GiB，请至少预留 2.1 GB 磁盘空间。
+## 游戏更新后
 
-## 更新与工作原理
+1. 正常启动一次游戏，等待客户端完成更新，然后关闭游戏。
+2. 再次双击 `Apply-TskSkinSwap.bat`。
 
-游戏版本更新后，再次双击 `Apply-TskSkinSwap.bat`。仍然有效的下载文件会被复用，目录中已变化的 bundle 会自动重新下载。
+脚本会保留仍然有效的文件，只补充或替换发生变化的资源。
 
-下载文件保存在 `downloaded/bundles/`。脚本只使用当前客户端目录提供的 URL，并校验文件大小、UnityFS 格式和目标 SkeletonData。游戏原始 Addressables bundle 与 Unity 缓存不会被修改。
+## 卸载方法
 
-## 卸载
+双击 `Uninstall-TskSkinSwap.bat` 即可停止使用 MOD。
 
-双击 `Uninstall-TskSkinSwap.bat`。卸载不会删除 BepInEx 或自动下载的资源。若需释放磁盘空间，可在卸载后删除 `downloaded/`。
+卸载不会删除已经下载的动画资源。若要同时释放约 2 GB 磁盘空间，可在卸载后删除 `TskSkinSwap\downloaded` 文件夹。
 
-## 发布说明
+## 常见问题
 
-请勿提交或重新分发 `.tools/`、`downloaded/`、`generated/`、`src/bin/` 或 `src/obj/`。其中 `downloaded/` 包含从游戏官方 CDN 获取的版权资源。第三方组件及许可证见 [THIRD_PARTY.md](THIRD_PARTY.md)。
+### 提示游戏正在运行
+
+请完全关闭游戏后重试。必要时打开任务管理器，确认 `twinkle_starknightsX.exe` 已退出。
+
+### 双击后下载失败
+
+确认网络可以访问 GitHub 和游戏官方 CDN，然后重新运行 BAT。已经成功下载的文件会被复用。
+
+### 安装成功但动画没有变化
+
+先确认测试角色拥有成人版变身动画，并实际触发“通常攻击 2”。游戏更新后出现此问题时，按“游戏更新后”的步骤重新应用 MOD。
+
+### 如何恢复原版
+
+运行 `Uninstall-TskSkinSwap.bat`，然后正常启动游戏即可。工具不会修改游戏原始资源文件。
+
+## 资源说明
+
+本仓库和 Release 不包含游戏动画资源。所需资源由脚本根据当前客户端信息，从游戏官方 CDN 下载并仅保存在用户本地。请勿重新分发下载得到的游戏资源。
