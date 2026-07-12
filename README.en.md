@@ -1,30 +1,33 @@
-# TskSkinSwap
+# Twinkle Star Knights Normal Attack 2 Animation Mod
 
-TskSkinSwap is an R18 animation replacement mod for the PC version of Twinkle Star Knights X. It replaces each supported character's Normal Attack 2 animation with that character's high-quality R18 transformation animation.
+This mod replaces Normal Attack 2 with each supported character's high-quality R18 transformation animation. PC and Android editions are available.
 
 [简体中文](README.md)
 
-## One-Click Installation
+## PC Release 1.0
 
-1. Download `TskSkinSwap-v0.5.0.zip` from [Releases](https://github.com/YayiMiko/TwinkleStarKnightsX-SkinSwap/releases).
-2. Extract the `TskSkinSwap` folder to `<game>/mods/TskSkinSwap/`.
-3. Start the game once after an update so Addressables refreshes its catalog, then close it.
-4. Double-click `Apply-TskSkinSwap.bat`.
+1. Download `TskSkinSwap-PC-v1.0.0.zip` from [PC Release 1.0](https://github.com/YayiMiko/TwinkleStarKnightsX-SkinSwap/releases/tag/pc-v1.0.0).
+2. Extract `TskSkinSwap` to `<game>/mods/TskSkinSwap/`.
+3. Close the game and double-click `Apply-TskSkinSwap.bat`.
+4. Start the game after `Completed successfully` appears.
 
-The first run downloads isolated copies of Python, UnityPy, the .NET 6 SDK, and BepInEx from their official sources. It then reads the installed client's current Addressables catalog and downloads the high-quality R18 transformation and matching Cutin bundles required by the mod.
+The first installation downloads about 2 GB. Run the BAT again after a game update.
 
-Adult Cutin is preferred when available; otherwise the downloader selects the matching high-quality general Cutin. The July 2026 catalog requires about 2.0 GiB of game bundles, so allow at least 2.1 GB of free disk space.
+## Android Release 0.1
 
-## Updates and Safety
+Android does not require root, but the first installation requires a Windows PC, USB debugging, a USB cable, and a compatible modded APK.
 
-Run `Apply-TskSkinSwap.bat` again after a game update. Existing valid downloads are reused, while changed bundles are downloaded from the URLs in the current client catalog.
+1. Download and fully extract `TskSkinSwap-Android-v0.1.0.zip` from [Android Release 0.1](https://github.com/YayiMiko/TwinkleStarKnightsX-SkinSwap/releases/tag/android-v0.1.0).
+2. Connect and unlock the phone, then approve USB debugging.
+3. Double-click `Apply-TskSkinSwap-Android.bat`.
+4. Wait for the installer to finish and restart the game.
 
-Downloaded files are stored under `downloaded/bundles/`. Their declared size, UnityFS structure, and required SkeletonData asset are validated before use. The tool never modifies the game's Addressables bundles or Unity cache.
+The installer reuses valid game cache files and downloads only missing resources.
 
 ## Uninstall
 
-Double-click `Uninstall-TskSkinSwap.bat`. The uninstaller leaves BepInEx and downloaded bundles in place. Delete `downloaded/` manually if you also want to reclaim disk space.
+Run the uninstall BAT included in the corresponding download. The mod does not replace the game's original animation files.
 
-## Distribution
+## Game Resources
 
-Do not commit or redistribute `.tools/`, `downloaded/`, `generated/`, `src/bin/`, or `src/obj/`. The `downloaded/` directory contains copyrighted game assets fetched from the official CDN. See [THIRD_PARTY.md](THIRD_PARTY.md) for dependency licenses.
+Releases do not contain game animations, APK files, account data, or generated mappings. Do not redistribute game resources downloaded by the installer.

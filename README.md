@@ -1,66 +1,57 @@
-# TskSkinSwap
+# 闪耀星骑士“通常攻击 2”成人变身动画替换 MOD
 
-这是一个适用于 PC 版《闪耀星骑士》的 R18 动画替换 MOD。
+本 MOD 会将《闪耀星骑士》中角色的“通常攻击 2”动画替换为该角色的高画质成人变身动画（R18），支持 PC 版和 Android 版。
 
-安装后，MOD 会将《闪耀星骑士》中角色的“通常攻击 2”动画替换为该角色的高画质变身动画（R18）。支持的角色会自动匹配，无需在游戏中逐个打开变身界面下载资源。
+游戏动画资源不会包含在下载包中。安装工具会根据你的游戏版本获取所需资源，并尽量复用已经下载的内容。
 
-[English](README.en.md)
+## 选择版本
 
-Android 预发布版请参阅 [Android 使用说明](README.android.md)。Android 版无需 Root，但需要兼容 Mod APK、USB 调试和 Windows 电脑完成首次安装。
+### PC 版 Release 1.0
 
-## 使用前准备
+适用于 Windows PC 版游戏，提供一键安装、更新和卸载。
 
-- 仅支持 Windows PC 版游戏。
-- 首次安装需要联网，并预留至少 2.1 GB 磁盘空间。
-- 操作前必须完全关闭游戏。
-- 游戏更新后，需要先正常启动并进入一次游戏，让客户端更新资源目录，然后再关闭游戏运行本工具。
+[下载 PC 版 Release 1.0](https://github.com/YayiMiko/TwinkleStarKnightsX-SkinSwap/releases/tag/pc-v1.0.0)
 
-## 安装方法
+1. 下载 `TskSkinSwap-PC-v1.0.0.zip` 并完整解压。
+2. 将解压出的 `TskSkinSwap` 文件夹放入游戏目录的 `mods` 文件夹。
+3. 完全关闭游戏，双击 `Apply-TskSkinSwap.bat`。
+4. 显示 `Completed successfully` 后启动游戏。
 
-1. 打开 [Releases](https://github.com/YayiMiko/TwinkleStarKnightsX-SkinSwap/releases)，下载最新的 `TskSkinSwap-版本号.zip`。
-2. 解压后，将整个 `TskSkinSwap` 文件夹放入游戏目录下的 `mods` 文件夹：
+首次安装约需下载 2 GB。详细说明见 [PC 版使用说明](README.pc.md)。
 
-   ```text
-   <游戏目录>\mods\TskSkinSwap\
-   ```
+### Android 版 Release 0.1
 
-3. 双击 `Apply-TskSkinSwap.bat`。
-4. 首次运行会自动下载运行组件和角色动画资源，请耐心等待。
-5. 窗口显示 `Completed successfully` 后，关闭窗口并启动游戏。
+适用于 Android 版游戏，无需 Root。首次安装需要 Windows 电脑、USB 数据线、USB 调试和兼容 Mod APK。
 
-以后正常启动游戏即可，不需要每次运行安装脚本。
+[下载 Android 版 Release 0.1](https://github.com/YayiMiko/TwinkleStarKnightsX-SkinSwap/releases/tag/android-v0.1.0)
+
+1. 下载 `TskSkinSwap-Android-v0.1.0.zip` 并完整解压。
+2. 手机连接电脑并允许 USB 调试。
+3. 双击 `Apply-TskSkinSwap-Android.bat`。
+4. 等待工具安装完成并自动重启游戏。
+
+实际下载量取决于手机已有缓存。详细说明见 [Android 版使用说明](README.android.md)。
 
 ## 游戏更新后
 
-1. 正常启动一次游戏，等待客户端完成更新，然后关闭游戏。
-2. 再次双击 `Apply-TskSkinSwap.bat`。
-
-脚本会保留仍然有效的文件，只补充或替换发生变化的资源。
-
-## 卸载方法
-
-双击 `Uninstall-TskSkinSwap.bat` 即可停止使用 MOD。
-
-卸载不会删除已经下载的动画资源。若要同时释放约 2 GB 磁盘空间，可在卸载后删除 `TskSkinSwap\downloaded` 文件夹。
+先正常启动游戏一次并完成更新，然后关闭游戏，重新运行对应平台的安装 BAT。仍然有效的资源会继续复用。
 
 ## 常见问题
 
-### 提示游戏正在运行
-
-请完全关闭游戏后重试。必要时打开任务管理器，确认 `twinkle_starknightsX.exe` 已退出。
-
-### 双击后下载失败
-
-确认网络可以访问 GitHub 和游戏官方 CDN，然后重新运行 BAT。已经成功下载的文件会被复用。
-
 ### 安装成功但动画没有变化
 
-先确认测试角色拥有变身动画（R18），并实际触发“通常攻击 2”。游戏更新后出现此问题时，按“游戏更新后”的步骤重新应用 MOD。
+确认测试角色拥有成人变身动画，并实际触发“通常攻击 2”。游戏更新后请重新应用 MOD。
+
+### 下载中断
+
+重新运行安装 BAT。已经完成的文件会被复用，无需从头开始。
 
 ### 如何恢复原版
 
-运行 `Uninstall-TskSkinSwap.bat`，然后正常启动游戏即可。工具不会修改游戏原始资源文件。
+运行下载包中的卸载 BAT。工具不会替换游戏原始动画文件。
 
 ## 资源说明
 
-本仓库和 Release 不包含游戏动画资源。所需资源由脚本根据当前客户端信息，从游戏官方 CDN 下载并仅保存在用户本地。请勿重新分发下载得到的游戏资源。
+本仓库和 Release 不包含游戏动画、账号数据或游戏安装包。请勿重新分发安装工具下载得到的游戏资源。
+
+[English](README.en.md)

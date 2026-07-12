@@ -1,11 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '0.6.0'
+    [string]$Version = '0.1.0'
 )
 
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
-    throw 'Version must be a semantic version such as 0.6.0.'
+    throw 'Version must be a semantic version such as 0.1.0.'
 }
 
 $toolRoot = $PSScriptRoot
