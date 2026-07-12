@@ -21,6 +21,8 @@ To upgrade from PC 1.0, you do not need to uninstall it. Close the game, replace
 
 Android does not require root, but the first installation requires a Windows PC, USB debugging, a USB cable, and a compatible modded APK.
 
+Known compatibility issue: some users report that the Android edition does not work on certain Xiaomi phones. The cause is still under investigation, and Xiaomi compatibility is not currently guaranteed.
+
 1. Download and fully extract `TskSkinSwap-Android-v0.1.0.zip` from [Android Release 0.1](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.1.0).
 2. Connect and unlock the phone, then approve USB debugging.
 3. Double-click `Apply-TskSkinSwap-Android.bat`.
