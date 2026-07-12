@@ -25,9 +25,16 @@ const fallbackRoot =
 const mappings = new Map<string, CharacterMapping>();
 const loadedBundles = new Map<string, Il2Cpp.Object>();
 const transformAssets = new Map<string, Il2Cpp.Object>();
+const transformDataByCharacter = new Map<string, Il2Cpp.Object>();
+const transformCharacterByData = new Map<string, string>();
 const pendingAssets = new Map<string, PendingAsset>();
 const completionScheduled = new Set<string>();
+const cutinAssetClones = new Map<string, Il2Cpp.Object>();
+const backgroundBones = new Map<string, { bg: Il2Cpp.Object; chara: Il2Cpp.Object }>();
 const retainedObjects: Il2Cpp.Object[] = [];
+
+const referenceAndroidAspect = 20 / 9;
+const referenceBackgroundWorldScale = 2.08;
 
 let root = fallbackRoot;
 
@@ -173,8 +180,16 @@ function finalizeTransformLoad(mapping: CharacterMapping): boolean {
 
   ensureAnimationAliases(transformData, mapping.characterId);
   transformAssets.set(mapping.characterId, transformAsset);
+  transformDataByCharacter.set(mapping.characterId, transformData);
+  transformCharacterByData.set(transformData.handle.toString(), mapping.characterId);
   pendingAssets.delete(mapping.characterId);
   retainedObjects.push(transformAsset, transformData);
+  const bundle = loadedBundles.get(mapping.transformBundle);
+  if (bundle !== undefined && !bundle.isNull()) {
+    bundle.method("Unload", 1).invoke(false);
+    loadedBundles.delete(mapping.transformBundle);
+    appendLog(`Released transform bundle container for character ${mapping.characterId}.`);
+  }
   appendLog(`Transform asset ready for character ${mapping.characterId}.`);
   return true;
 }
@@ -217,6 +232,72 @@ Il2Cpp.perform(() => {
     root = `${stringValue(persistentDataPath)}/tskskinswap`;
     readMappings();
 
+    const screen = Il2Cpp.domain
+      .assembly("UnityEngine.CoreModule")
+      .image.class("UnityEngine.Screen");
+    const screenWidth = Number(screen.method("get_width").invoke());
+    const screenHeight = Number(screen.method("get_height").invoke());
+    const screenAspect = Math.max(screenWidth, screenHeight) / Math.min(screenWidth, screenHeight);
+    const backgroundWorldScale =
+      referenceBackgroundWorldScale * Math.max(1, screenAspect / referenceAndroidAspect);
+
+    const skeletonClass = Il2Cpp.domain
+      .assembly("spine-unity")
+      .image.class("Spine.Skeleton");
+    const compensateBackground = (pointer: NativePointer): void => {
+      try {
+        const skeleton = new Il2Cpp.Object(pointer);
+        const skeletonData = skeleton.method("get_Data").invoke() as Il2Cpp.Object;
+        const characterId = transformCharacterByData.get(skeletonData.handle.toString());
+        if (characterId === undefined) {
+          return;
+        }
+
+        const skeletonKey = skeleton.handle.toString();
+        let bones = backgroundBones.get(skeletonKey);
+        if (bones === undefined) {
+          const bg = skeleton.method("FindBone", 1).invoke(Il2Cpp.string("bg")) as Il2Cpp.Object;
+          const chara = skeleton.method("FindBone", 1).invoke(Il2Cpp.string("chara")) as Il2Cpp.Object;
+          if (bg.isNull() || chara.isNull()) {
+            return;
+          }
+          bones = { bg, chara };
+          backgroundBones.set(skeletonKey, bones);
+          appendLog(
+            `Background scale compensation active for ${characterId}; aspect=${screenAspect} target=${backgroundWorldScale}.`,
+          );
+        }
+
+        const charaScaleX = Math.abs(Number(bones.chara.method("get_ScaleX").invoke()));
+        const charaScaleY = Math.abs(Number(bones.chara.method("get_ScaleY").invoke()));
+        if (charaScaleX > 0.001 && charaScaleY > 0.001) {
+          bones.bg.method("set_ScaleX").invoke(backgroundWorldScale / charaScaleX);
+          bones.bg.method("set_ScaleY").invoke(backgroundWorldScale / charaScaleY);
+        }
+      } catch (error) {
+        appendLog(`Failed to compensate Cutin background scale: ${String(error)}`);
+      }
+    };
+    const hookedWorldTransforms = new Set<string>();
+    for (const parameterCount of [0, 1]) {
+      try {
+        const method = skeletonClass.method("UpdateWorldTransform", parameterCount);
+        const address = method.virtualAddress.toString();
+        if (hookedWorldTransforms.has(address)) {
+          continue;
+        }
+        hookedWorldTransforms.add(address);
+        Interceptor.attach(method.virtualAddress, {
+          onEnter(args): void {
+            compensateBackground(args[0]);
+          },
+        });
+        appendLog(`Installed background compensation hook for UpdateWorldTransform/${parameterCount}.`);
+      } catch {
+        // Spine runtime versions expose either the zero- or one-argument overload.
+      }
+    }
+
     const setNormalCutin = Il2Cpp.domain
       .assembly("Assembly-CSharp")
       .image.class("EffectCutinManager")
@@ -252,13 +333,58 @@ Il2Cpp.perform(() => {
           const manager = new Il2Cpp.Object(args[0]);
           const cutinData = manager.field<Il2Cpp.Object>("cutinData").value;
           const transformAsset = transformAssets.get(characterId);
-          if (transformAsset === undefined || transformAsset.isNull()) {
+          const transformData = transformDataByCharacter.get(characterId);
+          if (
+            transformAsset === undefined ||
+            transformAsset.isNull() ||
+            transformData === undefined ||
+            transformData.isNull()
+          ) {
             appendLog(`Transform asset not ready for character ${characterId}; using original Cutin.`);
             return;
           }
+
+          const dictionaryKey = Il2Cpp.string(characterId);
+          const cloneKey = `${manager.handle}:${characterId}`;
+          let cutinClone = cutinAssetClones.get(cloneKey);
+          if (cutinClone === undefined || cutinClone.isNull()) {
+            const originalCutin = cutinData
+              .method("get_Item", 1)
+              .invoke(dictionaryKey) as Il2Cpp.Object;
+            if (originalCutin.isNull()) {
+              throw new Error(`Original Cutin asset not found for ${characterId}`);
+            }
+            const originalData = originalCutin
+              .method("GetSkeletonData", 1)
+              .invoke(false) as Il2Cpp.Object;
+            if (originalData.isNull()) {
+              throw new Error(`Original Cutin SkeletonData not found for ${characterId}`);
+            }
+            const unityObject = Il2Cpp.domain
+              .assembly("UnityEngine.CoreModule")
+              .image.class("UnityEngine.Object");
+            cutinClone = unityObject
+              .method("Instantiate", 1)
+              .invoke(originalCutin) as Il2Cpp.Object;
+            if (cutinClone.isNull()) {
+              throw new Error(`Unable to clone original Cutin asset for ${characterId}`);
+            }
+            cutinClone.method("InitializeWithData", 1).invoke(transformData);
+            const cloneData = cutinClone
+              .method("GetSkeletonData", 1)
+              .invoke(false) as Il2Cpp.Object;
+            if (!cloneData.isNull()) {
+              transformCharacterByData.set(cloneData.handle.toString(), characterId);
+            }
+            cutinAssetClones.set(cloneKey, cutinClone);
+            retainedObjects.push(cutinClone);
+            appendLog(
+              `Prepared Cutin clone for ${characterId}; originalScale=${originalCutin.field<number>("scale").value} transformScale=${transformAsset.field<number>("scale").value} originalSize=${originalData.method("get_Width").invoke()}x${originalData.method("get_Height").invoke()} transformSize=${transformData.method("get_Width").invoke()}x${transformData.method("get_Height").invoke()}.`,
+            );
+          }
           cutinData
             .method("set_Item", 2)
-            .invoke(Il2Cpp.string(characterId), transformAsset);
+            .invoke(dictionaryKey, cutinClone);
           appendLog(`Replaced battle Cutin entry for character ${characterId}.`);
         } catch (error) {
           appendLog(`Failed to replace battle Cutin for ${characterId}: ${String(error)}`);
