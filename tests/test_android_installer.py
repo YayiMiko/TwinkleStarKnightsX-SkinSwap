@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import io
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "android"))
 
@@ -68,6 +69,35 @@ def target(size: int) -> BundleTarget:
 
 
 class AndroidInstallerTests(unittest.TestCase):
+    def test_adb_restarts_and_retries_after_daemon_disconnect(self) -> None:
+        disconnected = subprocess.CompletedProcess(
+            ["adb", "shell", "stat"],
+            1,
+            stdout="",
+            stderr="* daemon still not running\ncannot connect to daemon at tcp:5037",
+        )
+        restarted = subprocess.CompletedProcess(["adb", "start-server"], 0, stdout="", stderr="")
+        succeeded = subprocess.CompletedProcess(
+            ["adb", "shell", "stat"], 0, stdout="123\n", stderr=""
+        )
+        adb = android_installer.Adb(Path("adb"))
+        with patch.object(adb, "_invoke", side_effect=[disconnected, restarted, succeeded]) as invoke:
+            self.assertEqual("123", adb.run("shell", "stat"))
+        self.assertEqual(
+            [call("shell", "stat"), call("start-server"), call("shell", "stat")],
+            invoke.call_args_list,
+        )
+
+    def test_adb_does_not_retry_non_connection_failure(self) -> None:
+        denied = subprocess.CompletedProcess(
+            ["adb", "shell", "stat"], 1, stdout="", stderr="permission denied"
+        )
+        adb = android_installer.Adb(Path("adb"))
+        with patch.object(adb, "_invoke", return_value=denied) as invoke:
+            with self.assertRaisesRegex(RuntimeError, "permission denied"):
+                adb.run("shell", "stat")
+        invoke.assert_called_once_with("shell", "stat")
+
     def test_inventory_requires_unityfs_header(self) -> None:
         inventory = android_installer.remote_inventory(FakeAdb(), ["/valid", "/invalid"])
         self.assertTrue(inventory["/valid"].is_unityfs)

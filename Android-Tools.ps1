@@ -1,5 +1,5 @@
-$script:TskPlatformToolsVersion = '37.0.0'
-$script:TskPlatformToolsHash = '4fe305812db074cea32903a489d061eb4454cbc90a49e8fea677f4b7af764918'
+$script:TskPlatformToolsVersion = '37.0.1'
+$script:TskPlatformToolsHash = '84df1e5628bc7e6a9f2bf750ab98c591a99a6d622fd48f789cf278336bab5b99'
 $script:TskPythonVersion = '3.12.10'
 $script:TskPythonHash = '4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3'
 

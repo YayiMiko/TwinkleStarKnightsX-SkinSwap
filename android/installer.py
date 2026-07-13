@@ -45,19 +45,50 @@ def parse_args() -> argparse.Namespace:
 
 
 class Adb:
+    RETRYABLE_DISCONNECTS = (
+        "daemon still not running",
+        "daemon not running",
+        "cannot connect to daemon",
+        "failed to start daemon",
+    )
+
     def __init__(self, executable: Path) -> None:
         self.executable = str(executable)
 
-    def run(self, *arguments: str, capture: bool = True) -> str:
-        result = subprocess.run(
+    def _invoke(self, *arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
             [self.executable, *arguments],
             check=False,
             text=True,
             encoding="utf-8",
             errors="replace",
-            stdout=subprocess.PIPE if capture else None,
-            stderr=subprocess.PIPE if capture else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
+
+    @classmethod
+    def _is_retryable_disconnect(cls, result: subprocess.CompletedProcess[str]) -> bool:
+        detail = ((result.stderr or "") + "\n" + (result.stdout or "")).lower()
+        return result.returncode != 0 and any(marker in detail for marker in cls.RETRYABLE_DISCONNECTS)
+
+    @staticmethod
+    def _emit(result: subprocess.CompletedProcess[str]) -> None:
+        if result.stdout:
+            print(result.stdout, end="", file=sys.stdout)
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+
+    def run(self, *arguments: str, capture: bool = True) -> str:
+        result = self._invoke(*arguments)
+        if self._is_retryable_disconnect(result):
+            print("ADB server disconnected; restarting and retrying once...", file=sys.stderr)
+            restart = self._invoke("start-server")
+            if restart.returncode != 0:
+                detail = (restart.stderr or restart.stdout or "").strip()
+                raise RuntimeError(f"ADB server restart failed: {detail}")
+            result = self._invoke(*arguments)
+        if not capture:
+            self._emit(result)
         if result.returncode != 0:
             detail = (result.stderr or result.stdout or "").strip()
             raise RuntimeError(f"adb {' '.join(arguments)} failed: {detail}")
