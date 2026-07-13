@@ -30,7 +30,7 @@
 
 [下载 Android 版 Release 0.2.6](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.6)
 
-新安装器只接受经过完整文件校验的标准兼容安卓安装包，能够保留汉化和手机上的大型游戏数据，并自动补齐缺失变身资源。已在 vivo X100 Pro（Android 16）完成通常攻击 1 和 2、连续击杀、图鉴预览后进入战斗、场景切换及完整重启测试。使用前请阅读 [Android 版说明](README.android.md)。
+Android 版会自动准备所需文件，保留汉化和手机上的大型游戏数据，并只补齐缺失的变身资源。已在 Android 16 真机完成通常攻击 1 和 2、连续击杀、图鉴预览后进入战斗、场景切换及完整重启测试。使用前请阅读 [Android 版说明](README.android.md)。
 
 ## 游戏更新后
 

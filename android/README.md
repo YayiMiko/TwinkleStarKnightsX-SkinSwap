@@ -2,7 +2,7 @@
 
 ## Current Status
 
-The public-APK-compatible installer passed the complete device regression checklist on a vivo X100 Pro running Android 16. Android 0.2.0 is distributed as a dev prerelease first; do not mark it as Latest until broader user testing is complete.
+The public-APK-compatible installer passed the complete device regression checklist on Android 16. Android 0.2.6 is the current formal Android release.
 
 ## Installation Architecture
 

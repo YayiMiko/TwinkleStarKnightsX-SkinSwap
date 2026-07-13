@@ -21,7 +21,7 @@ To upgrade from an older PC release, you do not need to uninstall it. Close the 
 
 ## Android Release 0.2.6
 
-The Android installer works with the verified public compatible APK and preserves the translation and existing game data. It has been tested on a vivo X100 Pro running Android 16. See [the Android instructions](README.android.md) before using [Android Release 0.2.6](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.6).
+The Android installer prepares the required files automatically while preserving the translation and existing game data. It has completed device testing on Android 16. See [the Android instructions](README.android.md) before using [Android Release 0.2.6](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.6).
 
 ## Uninstall
 
