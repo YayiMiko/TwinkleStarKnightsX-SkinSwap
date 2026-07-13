@@ -74,28 +74,33 @@ function Invoke-LocalPython {
 }
 
 function Initialize-InteropAssemblies {
-    param(
-        [string]$InteropPath,
-        [switch]$RequireRefresh
-    )
+    param([string]$InteropPath)
 
     Write-Host 'Generating IL2CPP interop assemblies...'
     $startedAt = Get-Date
-    $previousWrite = if (Test-Path $InteropPath) { (Get-Item $InteropPath).LastWriteTimeUtc } else { [datetime]::MinValue }
+    $logPath = Join-Path $GamePath 'BepInEx\LogOutput.log'
+    $previousLogWrite = if (Test-Path $logPath) { (Get-Item $logPath).LastWriteTimeUtc } else { [datetime]::MinValue }
     $process = Start-Process -FilePath (Join-Path $GamePath 'twinkle_starknightsX.exe') `
         -WorkingDirectory $GamePath -WindowStyle Hidden -PassThru
     $deadline = (Get-Date).AddSeconds(180)
+    $startupComplete = $false
     do {
         Start-Sleep -Seconds 1
-        $updated = (Test-Path $InteropPath) -and ((Get-Item $InteropPath).LastWriteTimeUtc -gt $previousWrite)
-    } while (-not $updated -and -not $process.HasExited -and (Get-Date) -lt $deadline)
+        if ((Test-Path $logPath) -and ((Get-Item $logPath).LastWriteTimeUtc -gt $previousLogWrite)) {
+            try {
+                $startupComplete = (Get-Content $logPath -Raw) -match 'Chainloader startup complete'
+            } catch {
+                $startupComplete = $false
+            }
+        }
+    } while (-not $startupComplete -and -not $process.HasExited -and (Get-Date) -lt $deadline)
 
     Stop-StartedGameProcesses -StartedAfter $startedAt
     if (-not (Test-Path $InteropPath)) {
         throw 'BepInEx did not generate IL2CPP interop assemblies.'
     }
-    if ($RequireRefresh -and -not $updated) {
-        throw 'The game changed, but BepInEx did not refresh the IL2CPP interop assemblies.'
+    if (-not $startupComplete) {
+        throw "BepInEx did not finish validating the IL2CPP interop assemblies. Check $logPath"
     }
 }
 
@@ -178,7 +183,7 @@ if (Test-Path $installedMapping) {
 }
 $gameChanged = $previousGameHash -and ($previousGameHash -ne $currentGameHash)
 if (-not (Test-Path $interopAssembly) -or $gameChanged) {
-    Initialize-InteropAssemblies -InteropPath $interopAssembly -RequireRefresh:$gameChanged
+    Initialize-InteropAssemblies -InteropPath $interopAssembly
 }
 
 Initialize-LocalPython
