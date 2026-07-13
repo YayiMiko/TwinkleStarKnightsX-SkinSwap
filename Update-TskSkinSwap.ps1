@@ -36,6 +36,7 @@ $dotnetVersion = '6.0.428'
 $dotnetZip = Join-Path $toolsRoot "dotnet-sdk-$dotnetVersion-win-x64.zip"
 $dotnetUrl = "https://builds.dotnet.microsoft.com/dotnet/Sdk/$dotnetVersion/dotnet-sdk-$dotnetVersion-win-x64.zip"
 $dotnetSha512 = 'c027cb47b264a13e529f8c7f3ba33ac91152b56749c8681fede1d6cd48723ae1e5f04a43bac1302ee81e35a5383f3e169654e5bb7c1d331dc11cce5a95052e32'
+$packagedPlugin = Join-Path $toolRoot 'TskSkinSwap.dll'
 $pythonDirectory = Join-Path $toolsRoot 'python'
 $localPython = Join-Path $pythonDirectory 'python.exe'
 $pythonZip = Join-Path $toolsRoot 'python-3.12.10-embed-amd64.zip'
@@ -221,6 +222,41 @@ function Initialize-LocalDotnet {
     }
 }
 
+function Test-PluginAssembly {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "The precompiled plugin DLL is missing: $Path"
+    }
+    try {
+        $assemblyName = [Reflection.AssemblyName]::GetAssemblyName($Path)
+    } catch {
+        throw "The precompiled plugin DLL is invalid: $Path"
+    }
+    if ($assemblyName.Name -ne 'TskSkinSwap') {
+        throw "The precompiled plugin has an unexpected assembly name: $($assemblyName.Name)"
+    }
+}
+
+function Resolve-PluginPath {
+    if (Test-Path -LiteralPath $packagedPlugin) {
+        Test-PluginAssembly -Path $packagedPlugin
+        Write-Host "Using precompiled plugin: $packagedPlugin"
+        return (Resolve-Path -LiteralPath $packagedPlugin).Path
+    }
+
+    if (-not (Test-Path (Join-Path $toolRoot '.git'))) {
+        throw 'The release package is incomplete because TskSkinSwap.dll is missing. Extract the complete ZIP again.'
+    }
+
+    Write-Host 'Precompiled plugin not found in the source checkout; building the development plugin...'
+    Initialize-LocalDotnet
+    & (Join-Path $toolRoot 'Build-TskSkinSwap.ps1') -GamePath $GamePath -SkipInstall
+    $developmentPlugin = Join-Path $toolRoot 'src\bin\Release\net6.0\TskSkinSwap.dll'
+    Test-PluginAssembly -Path $developmentPlugin
+    return (Resolve-Path -LiteralPath $developmentPlugin).Path
+}
+
 function Test-StagedMapping {
     param(
         [string]$Path,
@@ -332,6 +368,17 @@ function Remove-ObsoleteBundles {
         foreach ($obsoleteTool in @('get-pip.py', 'dotnet-install.ps1')) {
             Remove-Item -LiteralPath (Join-Path $toolsRoot $obsoleteTool) -Force -ErrorAction SilentlyContinue
         }
+        if (-not (Test-Path (Join-Path $toolRoot '.git'))) {
+            foreach ($obsoletePath in @(
+                (Join-Path $toolsRoot 'dotnet'),
+                (Join-Path $toolRoot 'Build-TskSkinSwap.ps1'),
+                (Join-Path $toolRoot 'src')
+            )) {
+                Remove-Item -LiteralPath $obsoletePath -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Get-ChildItem $toolsRoot -Filter 'dotnet-sdk-*.zip' -File -ErrorAction SilentlyContinue |
+                Remove-Item -Force -ErrorAction SilentlyContinue
+        }
         if (Test-Path $outputRoot) {
             Remove-Item -LiteralPath $outputRoot -Recurse -Force
         }
@@ -346,6 +393,10 @@ if (-not (Test-Path $gameAssemblyPath) -or -not (Test-Path $globalMetadataPath))
 
 if (Get-Process twinkle_starknightsX -ErrorAction SilentlyContinue) {
     throw 'The game is running. Close it before applying TskSkinSwap.'
+}
+
+if (-not (Test-Path (Join-Path $toolRoot '.git'))) {
+    Test-PluginAssembly -Path $packagedPlugin
 }
 
 New-Item -ItemType Directory -Force -Path $toolsRoot | Out-Null
@@ -365,8 +416,6 @@ if (-not $bepInExWasPresent) {
     $source = if ($legacyOwned) { 'legacy-inferred' } else { 'preexisting' }
     Write-InstallState -BepInExInstalledByTskSkinSwap $legacyOwned -OwnershipSource $source
 }
-
-Initialize-LocalDotnet
 
 $interopAssembly = Join-Path $GamePath 'BepInEx\interop\spine-unity.dll'
 $currentGameHash = (Get-FileHash $gameAssemblyPath -Algorithm SHA256).Hash
@@ -429,11 +478,7 @@ $stagedDocument = Test-StagedMapping `
     -ExpectedMetadataHash $currentMetadataHash
 
 if (-not $SkipBuild) {
-    & (Join-Path $toolRoot 'Build-TskSkinSwap.ps1') -GamePath $GamePath -SkipInstall
-    $stagedPlugin = Join-Path $toolRoot 'src\bin\Release\net6.0\TskSkinSwap.dll'
-    if (-not (Test-Path $stagedPlugin)) {
-        throw 'The staged plugin DLL was not generated.'
-    }
+    $stagedPlugin = Resolve-PluginPath
     Install-StagedFiles -MappingPath $stagedMapping -PluginPath $stagedPlugin
 }
 

@@ -46,6 +46,9 @@ jobs:
       - name: Test update rollback
         shell: powershell
         run: .\tests\Test-UpdateTransaction.ps1
+      - name: Test precompiled plugin packaging
+        shell: powershell
+        run: .\tests\Test-PrecompiledPlugin.ps1
       - name: Test uninstall ownership
         shell: powershell
         run: .\tests\Test-UninstallOwnership.ps1

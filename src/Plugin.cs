@@ -15,7 +15,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "com.codex.tskskinswap";
     public const string PluginName = "TSK Skin Swap";
-    public const string PluginVersion = "1.2.1";
+    public const string PluginVersion = "1.2.2";
 
     internal static ManualLogSource PluginLog { get; private set; } = null!;
 

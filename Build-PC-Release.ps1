@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '1.2.1'
+    [string]$Version = '1.2.2'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,27 +24,36 @@ if ($projectText -notmatch "<Version>$([regex]::Escape($Version))</Version>") {
     throw "Project version does not match release version $Version."
 }
 
+& (Join-Path $toolRoot 'Build-TskSkinSwap.ps1') -SkipInstall
+$pluginBinary = Join-Path $toolRoot 'src\bin\Release\net6.0\TskSkinSwap.dll'
+if (-not (Test-Path -LiteralPath $pluginBinary)) {
+    throw 'The precompiled plugin DLL was not generated.'
+}
+$assemblyName = [Reflection.AssemblyName]::GetAssemblyName($pluginBinary)
+if ($assemblyName.Name -ne 'TskSkinSwap' -or $assemblyName.Version.ToString() -ne "$Version.0") {
+    throw "Precompiled plugin version $($assemblyName.Version) does not match release version $Version."
+}
+
 if (Test-Path $releaseRoot) {
     Remove-Item -LiteralPath $releaseRoot -Recurse -Force
 }
-New-Item -ItemType Directory -Force -Path (Join-Path $stagingRoot 'src') | Out-Null
+New-Item -ItemType Directory -Force -Path $stagingRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $artifactsRoot | Out-Null
 
 Copy-Item (Join-Path $toolRoot 'README.pc.md') (Join-Path $stagingRoot 'README.md')
 $stagedReadme = Join-Path $stagingRoot 'README.md'
 $readmeText = Get-Content -Raw -Encoding UTF8 -LiteralPath $stagedReadme
-$readmeText = $readmeText.Replace('Release 1.2.0', "Release $Version").Replace('v1.2.0', "v$Version")
+$readmeText = $readmeText -replace 'Release \d+\.\d+\.\d+', "Release $Version"
+$readmeText = $readmeText -replace 'v\d+\.\d+\.\d+', "v$Version"
 Set-Content -LiteralPath $stagedReadme -Value $readmeText -Encoding UTF8
 Copy-Item (Join-Path $toolRoot 'README.en.md') $stagingRoot
 Copy-Item (Join-Path $toolRoot 'THIRD_PARTY.md') $stagingRoot
 Copy-Item (Join-Path $toolRoot 'Apply-TskSkinSwap.bat') $stagingRoot
-Copy-Item (Join-Path $toolRoot 'Build-TskSkinSwap.ps1') $stagingRoot
 Copy-Item (Join-Path $toolRoot 'Uninstall-TskSkinSwap.bat') $stagingRoot
 Copy-Item (Join-Path $toolRoot 'Uninstall-TskSkinSwap.ps1') $stagingRoot
 Copy-Item (Join-Path $toolRoot 'Update-TskSkinSwap.ps1') $stagingRoot
 Copy-Item (Join-Path $toolRoot 'catalog_downloader.py') $stagingRoot
-Copy-Item $pluginSource (Join-Path $stagingRoot 'src')
-Copy-Item (Join-Path $toolRoot 'src\TskSkinSwap.csproj') (Join-Path $stagingRoot 'src')
+Copy-Item $pluginBinary (Join-Path $stagingRoot 'TskSkinSwap.dll')
 
 Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
 Compress-Archive -LiteralPath $stagingRoot -DestinationPath $zipPath -CompressionLevel Optimal
