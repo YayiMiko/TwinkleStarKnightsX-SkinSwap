@@ -1,6 +1,6 @@
 {
   "name": "tskskinswap-android",
-  "version": "0.2.7",
+  "version": "0.2.6",
   "private": true,
   "scripts": {
     "build": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && frida-compile src/tskskinswap.ts -o dist/tskskinswap.js -c"

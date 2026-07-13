@@ -18,6 +18,12 @@ interface MappingDocument {
   characters: CharacterMapping[];
 }
 
+interface PendingAsset {
+  mapping: CharacterMapping;
+  request: Il2Cpp.Object;
+  generation: number;
+}
+
 const fallbackRoot =
   "/sdcard/Android/data/jp.co.fanzagames.twinklestarknightsx_a_mod/files/tskskinswap";
 
@@ -25,11 +31,14 @@ const mappings = new Map<string, CharacterMapping>();
 const loadedBundles = new Map<string, Il2Cpp.Object>();
 const transformAssets = new Map<string, Il2Cpp.Object>();
 const transformDataByCharacter = new Map<string, Il2Cpp.Object>();
+const pendingAssets = new Map<string, PendingAsset>();
+const completionScheduled = new Set<string>();
 const cutinAssetClones = new Map<string, Il2Cpp.Object>();
 const excludedCharacterIds = new Set(["1141001"]);
 
 let root = fallbackRoot;
 let activeManagerHandle = "";
+let assetGeneration = 0;
 
 function appendLog(message: string): void {
   const line = `${new Date().toISOString()} ${message}\n`;
@@ -168,10 +177,19 @@ function releaseBundle(path: string, unloadAll: boolean): void {
   loadedBundles.delete(path);
 }
 
+function abandonPending(mapping: CharacterMapping, generation: number): void {
+  const pending = pendingAssets.get(mapping.characterId);
+  if (pending !== undefined && pending.generation === generation) {
+    pendingAssets.delete(mapping.characterId);
+    releaseBundle(mapping.transformBundle, true);
+  }
+}
+
 function activateManager(handle: string): void {
   if (activeManagerHandle === handle) {
     return;
   }
+  assetGeneration += 1;
   activeManagerHandle = handle;
 
   const unityObject = Il2Cpp.domain
@@ -202,15 +220,19 @@ function activateManager(handle: string): void {
   }
   transformAssets.clear();
   transformDataByCharacter.clear();
+  pendingAssets.clear();
+  completionScheduled.clear();
   for (const path of Array.from(loadedBundles.keys())) {
     releaseBundle(path, true);
   }
-  appendLog(`Activated Cutin manager ${handle}.`);
+  appendLog(`Activated Cutin manager ${handle}; generation=${assetGeneration}.`);
 }
 
-function loadTransformAsset(mapping: CharacterMapping): void {
-  const existing = transformAssets.get(mapping.characterId);
-  if (existing !== undefined && !existing.isNull()) {
+function beginTransformLoad(mapping: CharacterMapping): void {
+  if (
+    transformAssets.has(mapping.characterId) ||
+    pendingAssets.has(mapping.characterId)
+  ) {
     return;
   }
 
@@ -218,30 +240,94 @@ function loadTransformAsset(mapping: CharacterMapping): void {
   const objectType = Il2Cpp.domain
     .assembly("UnityEngine.CoreModule")
     .image.class("UnityEngine.Object").type.object;
+  let request: Il2Cpp.Object;
   try {
-    const transformAsset = bundle
-      .method("LoadAsset", 2)
+    request = bundle
+      .method("LoadAssetAsync", 2)
       .invoke(Il2Cpp.string(mapping.transformSkeletonAsset), objectType) as Il2Cpp.Object;
-    if (transformAsset.isNull()) {
-      throw new Error(`Transform SkeletonDataAsset not found: ${mapping.transformSkeletonAsset}`);
+    if (request.isNull()) {
+      throw new Error(`Unable to start transform asset load for ${mapping.characterId}`);
     }
-
-    const transformData = transformAsset
-      .method("GetSkeletonData", 1)
-      .invoke(false) as Il2Cpp.Object;
-    if (transformData.isNull()) {
-      throw new Error(`Unable to parse transform skeleton for ${mapping.characterId}`);
-    }
-
-    ensureAnimationAliases(transformData, mapping.characterId);
-    transformAssets.set(mapping.characterId, transformAsset);
-    transformDataByCharacter.set(mapping.characterId, transformData);
-    releaseBundle(mapping.transformBundle, false);
-    appendLog(`Loaded transform asset synchronously for character ${mapping.characterId}.`);
   } catch (error) {
     releaseBundle(mapping.transformBundle, true);
     throw error;
   }
+  pendingAssets.set(mapping.characterId, { mapping, request, generation: assetGeneration });
+  appendLog(`Started transform asset load for character ${mapping.characterId}.`);
+}
+
+function finalizeTransformLoad(mapping: CharacterMapping, generation: number): boolean {
+  if (generation !== assetGeneration) {
+    return true;
+  }
+  const existing = transformAssets.get(mapping.characterId);
+  if (existing !== undefined && !existing.isNull()) {
+    return true;
+  }
+
+  const pending = pendingAssets.get(mapping.characterId);
+  if (pending === undefined || pending.generation !== generation) {
+    return false;
+  }
+  const isDone = Boolean(pending.request.method("get_isDone").invoke());
+  if (!isDone) {
+    return false;
+  }
+  const transformAsset = pending.request.method("get_asset").invoke() as Il2Cpp.Object;
+  if (transformAsset.isNull()) {
+    throw new Error(`Transform SkeletonDataAsset not found: ${mapping.transformSkeletonAsset}`);
+  }
+
+  const transformData = transformAsset.method("GetSkeletonData", 1).invoke(false) as Il2Cpp.Object;
+  if (transformData.isNull()) {
+    throw new Error(`Unable to parse transform skeleton for ${mapping.characterId}`);
+  }
+
+  ensureAnimationAliases(transformData, mapping.characterId);
+  transformAssets.set(mapping.characterId, transformAsset);
+  transformDataByCharacter.set(mapping.characterId, transformData);
+  pendingAssets.delete(mapping.characterId);
+  releaseBundle(mapping.transformBundle, false);
+  appendLog(`Released transform bundle container for character ${mapping.characterId}.`);
+  appendLog(`Transform asset ready for character ${mapping.characterId}.`);
+  return true;
+}
+
+function scheduleTransformCompletion(mapping: CharacterMapping, attempt = 0): void {
+  const generation = assetGeneration;
+  const taskKey = `${generation}:${mapping.characterId}`;
+  if (completionScheduled.has(taskKey)) {
+    return;
+  }
+  completionScheduled.add(taskKey);
+
+  const poll = (currentAttempt: number): void => {
+    setTimeout(() => {
+      if (generation !== assetGeneration) {
+        completionScheduled.delete(taskKey);
+        return;
+      }
+      void Il2Cpp.perform(() => finalizeTransformLoad(mapping, generation), "main")
+        .then((ready) => {
+          if (ready) {
+            completionScheduled.delete(taskKey);
+          } else if (currentAttempt < 60) {
+            poll(currentAttempt + 1);
+          } else {
+            completionScheduled.delete(taskKey);
+            abandonPending(mapping, generation);
+            appendLog(`Timed out loading transform asset for ${mapping.characterId}.`);
+          }
+        })
+        .catch((error) => {
+          completionScheduled.delete(taskKey);
+          abandonPending(mapping, generation);
+          appendLog(`Failed to finalize transform asset for ${mapping.characterId}: ${String(error)}`);
+        });
+    }, 500);
+  };
+
+  poll(attempt);
 }
 
 Il2Cpp.perform(() => {
@@ -274,13 +360,8 @@ Il2Cpp.perform(() => {
           for (let index = 0; index < ids.length; index += 1) {
             const mapping = mappings.get(ids.get(index).toString());
             if (mapping !== undefined) {
-              try {
-                loadTransformAsset(mapping);
-              } catch (error) {
-                appendLog(
-                  `Failed to preload transform asset for ${mapping.characterId}: ${String(error)}`,
-                );
-              }
+              beginTransformLoad(mapping);
+              scheduleTransformCompletion(mapping);
             }
           }
         } catch (error) {
