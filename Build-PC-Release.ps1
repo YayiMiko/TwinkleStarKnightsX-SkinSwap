@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '1.2.2'
+    [string]$Version = '1.2.2',
+    [string]$GamePath = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
+    [string]$VerifiedPluginPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,14 +26,23 @@ if ($projectText -notmatch "<Version>$([regex]::Escape($Version))</Version>") {
     throw "Project version does not match release version $Version."
 }
 
-& (Join-Path $toolRoot 'Build-TskSkinSwap.ps1') -SkipInstall
-$pluginBinary = Join-Path $toolRoot 'src\bin\Release\net6.0\TskSkinSwap.dll'
-if (-not (Test-Path -LiteralPath $pluginBinary)) {
+& (Join-Path $toolRoot 'Build-TskSkinSwap.ps1') -GamePath $GamePath -SkipInstall
+$builtPlugin = Join-Path $toolRoot 'src\bin\Release\net6.0\TskSkinSwap.dll'
+if (-not (Test-Path -LiteralPath $builtPlugin)) {
     throw 'The precompiled plugin DLL was not generated.'
 }
-$assemblyName = [Reflection.AssemblyName]::GetAssemblyName($pluginBinary)
+$assemblyName = [Reflection.AssemblyName]::GetAssemblyName($builtPlugin)
 if ($assemblyName.Name -ne 'TskSkinSwap' -or $assemblyName.Version.ToString() -ne "$Version.0") {
     throw "Precompiled plugin version $($assemblyName.Version) does not match release version $Version."
+}
+$pluginBinary = $builtPlugin
+if ($VerifiedPluginPath) {
+    $pluginBinary = (Resolve-Path -LiteralPath $VerifiedPluginPath).Path
+    $verifiedAssemblyName = [Reflection.AssemblyName]::GetAssemblyName($pluginBinary)
+    if ($verifiedAssemblyName.Name -ne 'TskSkinSwap' -or $verifiedAssemblyName.Version.ToString() -ne "$Version.0") {
+        throw "Verified plugin version $($verifiedAssemblyName.Version) does not match release version $Version."
+    }
+    Write-Host "Packaging verified plugin: $pluginBinary"
 }
 
 if (Test-Path $releaseRoot) {
