@@ -8,10 +8,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "android"))
 
-from apk_source import SourceAsset, download_asset, select_source_asset  # noqa: E402
+from apk_source import SourceAsset, SupportedApk, download_asset, select_source_asset  # noqa: E402
 
 
 class AndroidApkSourceTests(unittest.TestCase):
+    @staticmethod
+    def supported(sha256: str = "2" * 64) -> SupportedApk:
+        return SupportedApk(
+            release_tag="v2026.07.13",
+            asset_name="Kurusuta-X.Mod_01.03.03_patched.apk",
+            size=100,
+            sha256=sha256,
+            version_name="01.03.03",
+            version_code="195",
+        )
+
     def test_selects_standard_apk_and_ignores_legacy(self) -> None:
         release = {
             "tag_name": "v2026.07.13",
@@ -30,7 +41,7 @@ class AndroidApkSourceTests(unittest.TestCase):
                 },
             ],
         }
-        asset = select_source_asset(release)
+        asset = select_source_asset(release, self.supported())
         self.assertEqual("Kurusuta-X.Mod_01.03.03_patched.apk", asset.name)
         self.assertEqual("2" * 64, asset.sha256)
 
@@ -46,7 +57,22 @@ class AndroidApkSourceTests(unittest.TestCase):
             ],
         }
         with self.assertRaisesRegex(ValueError, "SHA-256"):
-            select_source_asset(release)
+            select_source_asset(release, self.supported())
+
+    def test_rejects_apk_outside_full_file_allowlist(self) -> None:
+        release = {
+            "tag_name": "v2026.07.13",
+            "assets": [
+                {
+                    "name": "Kurusuta-X.Mod_01.03.03_patched.apk",
+                    "size": 100,
+                    "digest": "sha256:" + "2" * 64,
+                    "browser_download_url": "https://github.com/example/current.apk",
+                }
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "full-file fingerprint"):
+            select_source_asset(release, self.supported("3" * 64))
 
     def test_valid_cached_apk_does_not_open_network(self) -> None:
         payload = b"apk"

@@ -38,7 +38,8 @@ if (-not (Test-Path $metadataPath)) {
 $metadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
 if ($metadata.schemaVersion -ne 1 -or
     $metadata.assetName -notmatch '^Kurusuta-X\.Mod_[0-9.]+_patched\.apk$' -or
-    $metadata.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
+    $metadata.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+    [string]$metadata.versionCode -notmatch '^\d+$') {
     throw 'The cached compatible APK metadata is invalid.'
 }
 $sourceApk = Join-Path $apkCache $metadata.assetName
@@ -48,6 +49,16 @@ if (-not (Test-Path $sourceApk)) {
 $sourceHash = (Get-FileHash -LiteralPath $sourceApk -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($sourceHash -ne $metadata.sha256.ToLowerInvariant()) {
     throw 'The cached compatible APK failed SHA-256 validation.'
+}
+$packageDetails = & $adbExe shell dumpsys package $Package
+$versionCodeLine = $packageDetails | Where-Object { $_ -match '^\s*versionCode=(\d+)' } | Select-Object -First 1
+if (-not $versionCodeLine) {
+    throw 'Unable to read the installed Android package version.'
+}
+[void]($versionCodeLine -match '^\s*versionCode=(\d+)')
+$installedVersionCode = $Matches[1]
+if ($installedVersionCode -ne [string]$metadata.versionCode) {
+    throw 'The cached compatible APK does not match the installed game version. Apply a current TskSkinSwap package before uninstalling.'
 }
 
 $filesRoot = "/sdcard/Android/data/$Package/files"

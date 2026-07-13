@@ -11,12 +11,17 @@ interface CharacterMapping {
 
 interface MappingDocument {
   schemaVersion: number;
+  packageName: string;
+  packageVersionName: string;
+  catalogSha256: string;
+  catalogPath: string;
   characters: CharacterMapping[];
 }
 
 interface PendingAsset {
   mapping: CharacterMapping;
   request: Il2Cpp.Object;
+  generation: number;
 }
 
 const fallbackRoot =
@@ -29,10 +34,11 @@ const transformDataByCharacter = new Map<string, Il2Cpp.Object>();
 const pendingAssets = new Map<string, PendingAsset>();
 const completionScheduled = new Set<string>();
 const cutinAssetClones = new Map<string, Il2Cpp.Object>();
-const retainedObjects: Il2Cpp.Object[] = [];
 const excludedCharacterIds = new Set(["1141001"]);
 
 let root = fallbackRoot;
+let activeManagerHandle = "";
+let assetGeneration = 0;
 
 function appendLog(message: string): void {
   const line = `${new Date().toISOString()} ${message}\n`;
@@ -46,11 +52,44 @@ function appendLog(message: string): void {
   }
 }
 
-function readMappings(): void {
+function hashFile(path: string): string {
+  const input = new File(path, "rb");
+  const checksum = new Checksum("sha256");
+  try {
+    while (true) {
+      const chunk = input.readBytes(1024 * 1024);
+      if (chunk.byteLength === 0) {
+        break;
+      }
+      checksum.update(chunk);
+    }
+    return checksum.getString();
+  } finally {
+    input.close();
+  }
+}
+
+function readMappings(packageVersionName: string): void {
   const document = JSON.parse(File.readAllText(`${root}/mappings.json`)) as MappingDocument;
-  if (document.schemaVersion !== 1 || !Array.isArray(document.characters)) {
+  if (document.schemaVersion !== 2 || !Array.isArray(document.characters)) {
     throw new Error("Unsupported mappings.json schema");
   }
+  const expectedPackage = "jp.co.fanzagames.twinklestarknightsx_a_mod";
+  const expectedCatalog = `${root.substring(0, root.lastIndexOf("/"))}/com.unity.addressables/catalog_0.0.0.json`;
+  if (document.packageName !== expectedPackage) {
+    throw new Error("Mapping package does not match the installed game");
+  }
+  if (document.packageVersionName !== packageVersionName) {
+    throw new Error("Game version changed; run Apply-TskSkinSwap-Android.bat again");
+  }
+  if (document.catalogPath !== expectedCatalog) {
+    throw new Error("Mapping catalog path is invalid");
+  }
+  const currentCatalogHash = hashFile(expectedCatalog);
+  if (currentCatalogHash !== document.catalogSha256.toLowerCase()) {
+    throw new Error("Game catalog changed; run Apply-TskSkinSwap-Android.bat again");
+  }
+  appendLog(`Mapping fingerprint verified for version ${packageVersionName}.`);
 
   for (const mapping of document.characters) {
     if (mapping.enabled && !excludedCharacterIds.has(mapping.characterId)) {
@@ -83,7 +122,6 @@ function loadBundle(path: string): Il2Cpp.Object {
     throw new Error(`Unable to load bundle: ${path}`);
   }
   loadedBundles.set(path, bundle);
-  retainedObjects.push(bundle);
   return bundle;
 }
 
@@ -122,9 +160,72 @@ function ensureAnimationAliases(skeletonData: Il2Cpp.Object, characterId: string
     const duration = source.method("get_Duration").invoke() as number;
     alias.method(".ctor", 3).invoke(Il2Cpp.string(aliasName), timelines, duration);
     animations.method("Add", 1).invoke(alias);
-    retainedObjects.push(alias);
     appendLog(`Added animation alias ${characterId} ${aliasName}->${animationName(source)}`);
   }
+}
+
+function releaseBundle(path: string, unloadAll: boolean): void {
+  const bundle = loadedBundles.get(path);
+  if (bundle === undefined || bundle.isNull()) {
+    return;
+  }
+  try {
+    bundle.method("Unload", 1).invoke(unloadAll);
+  } catch (error) {
+    appendLog(`Failed to unload bundle ${path}: ${String(error)}`);
+  }
+  loadedBundles.delete(path);
+}
+
+function abandonPending(mapping: CharacterMapping, generation: number): void {
+  const pending = pendingAssets.get(mapping.characterId);
+  if (pending !== undefined && pending.generation === generation) {
+    pendingAssets.delete(mapping.characterId);
+    releaseBundle(mapping.transformBundle, true);
+  }
+}
+
+function activateManager(handle: string): void {
+  if (activeManagerHandle === handle) {
+    return;
+  }
+  assetGeneration += 1;
+  activeManagerHandle = handle;
+
+  const unityObject = Il2Cpp.domain
+    .assembly("UnityEngine.CoreModule")
+    .image.class("UnityEngine.Object");
+  for (const clone of cutinAssetClones.values()) {
+    if (!clone.isNull()) {
+      try {
+        unityObject.method("Destroy", 1).invoke(clone);
+      } catch (error) {
+        appendLog(`Failed to destroy stale Cutin clone: ${String(error)}`);
+      }
+    }
+  }
+  cutinAssetClones.clear();
+
+  const resources = Il2Cpp.domain
+    .assembly("UnityEngine.CoreModule")
+    .image.class("UnityEngine.Resources");
+  for (const asset of transformAssets.values()) {
+    if (!asset.isNull()) {
+      try {
+        resources.method("UnloadAsset", 1).invoke(asset);
+      } catch (error) {
+        appendLog(`Failed to unload stale transform asset: ${String(error)}`);
+      }
+    }
+  }
+  transformAssets.clear();
+  transformDataByCharacter.clear();
+  pendingAssets.clear();
+  completionScheduled.clear();
+  for (const path of Array.from(loadedBundles.keys())) {
+    releaseBundle(path, true);
+  }
+  appendLog(`Activated Cutin manager ${handle}; generation=${assetGeneration}.`);
 }
 
 function beginTransformLoad(mapping: CharacterMapping): void {
@@ -139,25 +240,33 @@ function beginTransformLoad(mapping: CharacterMapping): void {
   const objectType = Il2Cpp.domain
     .assembly("UnityEngine.CoreModule")
     .image.class("UnityEngine.Object").type.object;
-  const request = bundle
-    .method("LoadAssetAsync", 2)
-    .invoke(Il2Cpp.string(mapping.transformSkeletonAsset), objectType) as Il2Cpp.Object;
-  if (request.isNull()) {
-    throw new Error(`Unable to start transform asset load for ${mapping.characterId}`);
+  let request: Il2Cpp.Object;
+  try {
+    request = bundle
+      .method("LoadAssetAsync", 2)
+      .invoke(Il2Cpp.string(mapping.transformSkeletonAsset), objectType) as Il2Cpp.Object;
+    if (request.isNull()) {
+      throw new Error(`Unable to start transform asset load for ${mapping.characterId}`);
+    }
+  } catch (error) {
+    releaseBundle(mapping.transformBundle, true);
+    throw error;
   }
-  pendingAssets.set(mapping.characterId, { mapping, request });
-  retainedObjects.push(request);
+  pendingAssets.set(mapping.characterId, { mapping, request, generation: assetGeneration });
   appendLog(`Started transform asset load for character ${mapping.characterId}.`);
 }
 
-function finalizeTransformLoad(mapping: CharacterMapping): boolean {
+function finalizeTransformLoad(mapping: CharacterMapping, generation: number): boolean {
+  if (generation !== assetGeneration) {
+    return true;
+  }
   const existing = transformAssets.get(mapping.characterId);
   if (existing !== undefined && !existing.isNull()) {
     return true;
   }
 
   const pending = pendingAssets.get(mapping.characterId);
-  if (pending === undefined) {
+  if (pending === undefined || pending.generation !== generation) {
     return false;
   }
   const isDone = Boolean(pending.request.method("get_isDone").invoke());
@@ -178,38 +287,41 @@ function finalizeTransformLoad(mapping: CharacterMapping): boolean {
   transformAssets.set(mapping.characterId, transformAsset);
   transformDataByCharacter.set(mapping.characterId, transformData);
   pendingAssets.delete(mapping.characterId);
-  retainedObjects.push(transformAsset, transformData);
-  const bundle = loadedBundles.get(mapping.transformBundle);
-  if (bundle !== undefined && !bundle.isNull()) {
-    bundle.method("Unload", 1).invoke(false);
-    loadedBundles.delete(mapping.transformBundle);
-    appendLog(`Released transform bundle container for character ${mapping.characterId}.`);
-  }
+  releaseBundle(mapping.transformBundle, false);
+  appendLog(`Released transform bundle container for character ${mapping.characterId}.`);
   appendLog(`Transform asset ready for character ${mapping.characterId}.`);
   return true;
 }
 
 function scheduleTransformCompletion(mapping: CharacterMapping, attempt = 0): void {
-  if (completionScheduled.has(mapping.characterId)) {
+  const generation = assetGeneration;
+  const taskKey = `${generation}:${mapping.characterId}`;
+  if (completionScheduled.has(taskKey)) {
     return;
   }
-  completionScheduled.add(mapping.characterId);
+  completionScheduled.add(taskKey);
 
   const poll = (currentAttempt: number): void => {
     setTimeout(() => {
-      void Il2Cpp.perform(() => finalizeTransformLoad(mapping), "main")
+      if (generation !== assetGeneration) {
+        completionScheduled.delete(taskKey);
+        return;
+      }
+      void Il2Cpp.perform(() => finalizeTransformLoad(mapping, generation), "main")
         .then((ready) => {
           if (ready) {
-            completionScheduled.delete(mapping.characterId);
+            completionScheduled.delete(taskKey);
           } else if (currentAttempt < 60) {
             poll(currentAttempt + 1);
           } else {
-            completionScheduled.delete(mapping.characterId);
+            completionScheduled.delete(taskKey);
+            abandonPending(mapping, generation);
             appendLog(`Timed out loading transform asset for ${mapping.characterId}.`);
           }
         })
         .catch((error) => {
-          completionScheduled.delete(mapping.characterId);
+          completionScheduled.delete(taskKey);
+          abandonPending(mapping, generation);
           appendLog(`Failed to finalize transform asset for ${mapping.characterId}: ${String(error)}`);
         });
     }, 500);
@@ -225,7 +337,14 @@ Il2Cpp.perform(() => {
       .image.class("UnityEngine.Application");
     const persistentDataPath = application.method("get_persistentDataPath").invoke();
     root = `${stringValue(persistentDataPath)}/tskskinswap`;
-    readMappings();
+    try {
+      const currentLog = new File(`${root}/runtime.log`, "w");
+      currentLog.close();
+    } catch {
+      // Logging remains best-effort.
+    }
+    const packageVersionName = stringValue(application.method("get_version").invoke());
+    readMappings(packageVersionName);
 
     const setNormalCutin = Il2Cpp.domain
       .assembly("Assembly-CSharp")
@@ -236,6 +355,7 @@ Il2Cpp.perform(() => {
     Interceptor.attach(loadCutin.virtualAddress, {
       onEnter(args): void {
         try {
+          activateManager(args[0].toString());
           const ids = new Il2Cpp.Array<number>(args[1]);
           for (let index = 0; index < ids.length; index += 1) {
             const mapping = mappings.get(ids.get(index).toString());
@@ -259,6 +379,7 @@ Il2Cpp.perform(() => {
         }
 
         try {
+          activateManager(args[0].toString());
           const manager = new Il2Cpp.Object(args[0]);
           const cutinData = manager.field<Il2Cpp.Object>("cutinData").value;
           const transformAsset = transformAssets.get(characterId);
@@ -300,7 +421,6 @@ Il2Cpp.perform(() => {
             }
             cutinClone.method("InitializeWithData", 1).invoke(transformData);
             cutinAssetClones.set(cloneKey, cutinClone);
-            retainedObjects.push(cutinClone);
             appendLog(
               `Prepared Cutin clone for ${characterId}; originalScale=${originalCutin.field<number>("scale").value} transformScale=${transformAsset.field<number>("scale").value} originalSize=${originalData.method("get_Width").invoke()}x${originalData.method("get_Height").invoke()} transformSize=${transformData.method("get_Width").invoke()}x${transformData.method("get_Height").invoke()}.`,
             );

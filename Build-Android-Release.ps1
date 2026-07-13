@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = '0.2.0-dev'
+    [string]$Version = '0.2.1-dev'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,6 +16,11 @@ $packageName = "TskSkinSwap-Android-v$Version"
 $stagingRoot = Join-Path $toolsRoot $packageName
 $zipPath = Join-Path $artifactsRoot "$packageName.zip"
 $hashPath = "$zipPath.sha256"
+$packageVersion = (Get-Content -Raw -Encoding UTF8 (Join-Path $androidRoot 'package.json') | ConvertFrom-Json).version
+$releaseBaseVersion = $Version -replace '-.*$', ''
+if ($packageVersion -ne $releaseBaseVersion) {
+    throw "Android package version $packageVersion does not match release version $Version."
+}
 
 Push-Location $androidRoot
 try {
@@ -51,6 +56,7 @@ Copy-Item (Join-Path $toolRoot 'catalog_downloader.py') $stagingRoot
 Copy-Item (Join-Path $androidRoot 'installer.py') (Join-Path $stagingRoot 'android')
 Copy-Item (Join-Path $androidRoot 'apk_patcher.py') (Join-Path $stagingRoot 'android')
 Copy-Item (Join-Path $androidRoot 'apk_source.py') (Join-Path $stagingRoot 'android')
+Copy-Item (Join-Path $androidRoot 'supported_apks.json') (Join-Path $stagingRoot 'android')
 Copy-Item (Join-Path $androidRoot 'dist\tskskinswap.js') (Join-Path $stagingRoot 'android\runtime')
 Set-Content -LiteralPath (Join-Path $stagingRoot 'VERSION') -Value $Version -Encoding ASCII
 

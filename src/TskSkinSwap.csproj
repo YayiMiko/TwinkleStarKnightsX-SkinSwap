@@ -9,7 +9,7 @@
     <Deterministic>true</Deterministic>
     <AssemblyName>TskSkinSwap</AssemblyName>
     <RootNamespace>TskSkinSwap</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

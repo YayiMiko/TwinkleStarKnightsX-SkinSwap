@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
@@ -18,11 +21,18 @@ DEFAULT_PACKAGE = "jp.co.fanzagames.twinklestarknightsx_a_mod"
 CATALOG_NAME = "catalog_0.0.0.json"
 
 
+@dataclass(frozen=True)
+class RemoteFile:
+    size: int
+    is_unityfs: bool
+
+
 def parse_args() -> argparse.Namespace:
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description="Install TskSkinSwap on a connected Android device.")
     parser.add_argument("--adb", type=Path, default=Path("adb"))
     parser.add_argument("--package", default=DEFAULT_PACKAGE)
+    parser.add_argument("--package-version-name")
     parser.add_argument("--script", type=Path)
     parser.add_argument("--output-dir", type=Path, default=root / "downloaded" / "android")
     parser.add_argument("--quality", choices=("HighQuality", "LowQuality"), default="HighQuality")
@@ -102,21 +112,58 @@ def acquire_install_lock(output_root: Path) -> BinaryIO:
     return handle
 
 
-def remote_inventory(adb: Adb, paths: list[str]) -> dict[str, int]:
-    inventory: dict[str, int] = {}
+def remote_inventory(adb: Adb, paths: list[str]) -> dict[str, RemoteFile]:
+    inventory: dict[str, RemoteFile] = {}
     batch_size = 40
     for offset in range(0, len(paths), batch_size):
         batch = paths[offset : offset + batch_size]
         command = (
             "for p in "
             + " ".join(quote_shell(path) for path in batch)
-            + "; do if [ -f \"$p\" ]; then stat -c '%s %n' \"$p\"; fi; done"
+            + "; do if [ -f \"$p\" ]; then "
+            + "s=$(stat -c '%s' \"$p\"); h=$(head -c 7 \"$p\"); "
+            + "printf '%s\\t%s\\t%s\\n' \"$s\" \"$h\" \"$p\"; fi; done"
         )
         for line in adb.shell(command).splitlines():
-            size, separator, path = line.partition(" ")
-            if separator and size.isdigit():
-                inventory[path] = int(size)
+            parts = line.split("\t", 2)
+            if len(parts) == 3 and parts[0].isdigit():
+                inventory[parts[2]] = RemoteFile(
+                    size=int(parts[0]),
+                    is_unityfs=parts[1] == "UnityFS",
+                )
     return inventory
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def push_atomic(adb: Adb, local: Path, remote: str, require_unityfs: bool = False) -> None:
+    temporary = remote + ".tsknew"
+    adb.shell(f"rm -f {quote_shell(temporary)}")
+    try:
+        adb.push(local, temporary)
+        remote_size = adb.shell(f"stat -c '%s' {quote_shell(temporary)}")
+        if not remote_size.isdigit() or int(remote_size) != local.stat().st_size:
+            raise RuntimeError(f"Device size verification failed: {remote}")
+        if require_unityfs:
+            header = adb.shell(f"head -c 7 {quote_shell(temporary)}")
+            if header != "UnityFS":
+                raise RuntimeError(f"Device UnityFS verification failed: {remote}")
+        remote_hash = adb.shell(f"sha256sum {quote_shell(temporary)}").split()[0].lower()
+        if remote_hash != sha256_file(local):
+            raise RuntimeError(f"Device SHA-256 verification failed: {remote}")
+        adb.shell(f"mv -f {quote_shell(temporary)} {quote_shell(remote)}")
+    except Exception:
+        try:
+            adb.shell(f"rm -f {quote_shell(temporary)}")
+        except Exception:
+            pass
+        raise
 
 
 def validate_download(path: Path, target: BundleTarget) -> None:
@@ -125,6 +172,27 @@ def validate_download(path: Path, target: BundleTarget) -> None:
     with path.open("rb") as stream:
         if stream.read(7) != b"UnityFS":
             raise ValueError(f"invalid UnityFS header for {target.character_id}")
+
+
+def build_mapping_document(
+    package: str,
+    package_version_name: str,
+    catalog_hash: str,
+    catalog_path: str,
+    quality: str,
+    edition: str,
+    records: list[dict[str, object]],
+) -> dict[str, object]:
+    return {
+        "schemaVersion": 2,
+        "packageName": package,
+        "packageVersionName": package_version_name,
+        "catalogSha256": catalog_hash,
+        "catalogPath": catalog_path,
+        "quality": quality,
+        "edition": edition,
+        "characters": records,
+    }
 
 
 def download(target: BundleTarget, destination: Path) -> None:
@@ -140,7 +208,15 @@ def download(target: BundleTarget, destination: Path) -> None:
         headers["Range"] = f"bytes={offset}-"
     request = urllib.request.Request(target.url, headers=headers)
     with urllib.request.urlopen(request, timeout=60) as response:
+        if not response.geturl().startswith("https://"):
+            raise ValueError("bundle download redirected to a non-HTTPS URL")
         append = offset > 0 and response.status == 206
+        if append:
+            content_range = response.headers.get("Content-Range", "")
+            if not content_range.startswith(f"bytes {offset}-") or not content_range.endswith(
+                f"/{target.size}"
+            ):
+                raise ValueError("bundle server returned an invalid resume range")
         mode = "ab" if append else "wb"
         if not append:
             offset = 0
@@ -154,13 +230,23 @@ def download(target: BundleTarget, destination: Path) -> None:
 
 def main() -> int:
     args = parse_args()
+    if not re.fullmatch(r"[A-Za-z0-9._]+", args.package):
+        raise ValueError("Invalid Android package name")
     adb = Adb(args.adb)
     if adb.run("get-state") != "device":
         raise RuntimeError("No authorized Android device is connected.")
     if not adb.shell(f"pm path {args.package}").startswith("package:"):
         raise RuntimeError(f"Package is not installed: {args.package}")
+    package_details = adb.shell(f"dumpsys package {args.package}")
+    version_match = re.search(r"^\s*versionName=(\S+)\s*$", package_details, re.MULTILINE)
+    if version_match is None:
+        raise RuntimeError("Unable to read the installed Android package version")
+    package_version_name = args.package_version_name or version_match.group(1)
 
-    files_root = f"/sdcard/Android/data/{args.package}/files"
+    files_root_alias = f"/sdcard/Android/data/{args.package}/files"
+    files_root = adb.shell(f"readlink -f {quote_shell(files_root_alias)}") or files_root_alias
+    if not files_root.startswith("/"):
+        raise RuntimeError("Unable to resolve the Android persistent data path")
     catalog_remote = f"{files_root}/com.unity.addressables/{CATALOG_NAME}"
     mod_root = f"{files_root}/tskskinswap"
     mod_bundle_root = f"{mod_root}/bundles"
@@ -215,11 +301,13 @@ def main() -> int:
     for target in targets:
         cache_path = f"{cache_root}/{target.bundle_name}/{target.catalog_hash}/__data"
         mod_path = f"{mod_bundle_root}/{file_name(target)}"
-        if inventory.get(cache_path) == target.size:
+        cache_entry = inventory.get(cache_path)
+        mod_entry = inventory.get(mod_path)
+        if cache_entry is not None and cache_entry.size == target.size and cache_entry.is_unityfs:
             selected_path = cache_path
             source = "unity-cache"
             reused_cache += 1
-        elif inventory.get(mod_path) == target.size:
+        elif mod_entry is not None and mod_entry.size == target.size and mod_entry.is_unityfs:
             selected_path = mod_path
             source = "mod-storage"
             reused_mod += 1
@@ -261,22 +349,21 @@ def main() -> int:
             downloaded += 1
         remote = str(by_character[target.character_id]["transformBundle"])
         print(f"  pushing {target.character_id} to the device...")
-        adb.push(destination, remote)
-        remote_size = adb.shell(f"stat -c '%s' {quote_shell(remote)}")
-        if not remote_size.isdigit() or int(remote_size) != target.size:
-            raise RuntimeError(f"Device size verification failed for {target.character_id}")
+        push_atomic(adb, destination, remote, require_unityfs=True)
         pushed += 1
 
     mapping_path = output_root / "mappings.json"
     mapping_path.write_text(
         json.dumps(
-            {
-                "schemaVersion": 1,
-                "catalogSha256": catalog_hash,
-                "quality": args.quality,
-                "edition": args.edition,
-                "characters": records,
-            },
+            build_mapping_document(
+                args.package,
+                package_version_name,
+                catalog_hash,
+                catalog_remote,
+                args.quality,
+                args.edition,
+                records,
+            ),
             ensure_ascii=False,
             indent=2,
         )
@@ -284,7 +371,7 @@ def main() -> int:
         encoding="utf-8",
         newline="\n",
     )
-    adb.push(mapping_path, f"{mod_root}/mappings.json")
+    push_atomic(adb, mapping_path, f"{mod_root}/mappings.json")
     if not args.embedded_runtime:
         runtime_script = resolve_script(args.script)
         adb.push(runtime_script, f"{files_root}/frida-scripts/tskskinswap.js")

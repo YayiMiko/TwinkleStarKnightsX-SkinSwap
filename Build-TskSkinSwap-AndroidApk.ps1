@@ -17,10 +17,7 @@ $developmentToolsRoot = Join-Path $toolRoot '.tools\android'
 $portableToolsRoot = Join-Path $toolRoot '.tools\android-apk'
 $outputRoot = Join-Path $toolRoot '.tools\android-output'
 $patcher = Join-Path $androidRoot 'apk_patcher.py'
-$expectedPackage = 'jp.co.fanzagames.twinklestarknightsx_a_mod'
-$expectedSigner = 'f7697c6633707cd741e11ae28236511b85f51fb6a1f41f4f8c6d1301f46ce0fb'
-$expectedTranslation = 'f10ec5b90302839f35388eb1820cf757f722ed5b0c076eae99d2a43f3bd8539b'
-$expectedGadget = 'b02615fd08c005ec69cd8ce46d43a5edff1b21f4269d2ed7719c83c8485a1dac'
+$supportedApkManifest = Join-Path $androidRoot 'supported_apks.json'
 $buildToolsUrl = 'https://dl.google.com/android/repository/build-tools_r36_windows.zip'
 $buildToolsHash = 'aa1095cb14d83e483818a748a2c06faaeb8e601561b06a356a119a1b2ca280d3'
 $jreUrl = 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.19%2B10/OpenJDK17U-jre_x64_windows_hotspot_17.0.19_10.zip'
@@ -160,7 +157,7 @@ $zipalign = $apkTools.Zipalign
 $apksigner = $apkTools.Apksigner
 $java = $apkTools.Java
 $objectionKey = $apkTools.Key
-$requiredTools = @($patcher, $aapt, $zipalign, $apksigner, $java, $objectionKey)
+$requiredTools = @($patcher, $supportedApkManifest, $aapt, $zipalign, $apksigner, $java, $objectionKey)
 if (-not $python) {
     throw 'Python was not found.'
 }
@@ -204,9 +201,27 @@ New-Item -ItemType Directory -Force -Path $staging | Out-Null
 try {
     Copy-Item -LiteralPath $resolvedInput -Destination $stagedInput
     Copy-Item -LiteralPath $objectionKey -Destination $stagedKey
+    $inputHash = (Get-FileHash -LiteralPath $stagedInput -Algorithm SHA256).Hash.ToLowerInvariant()
+    $manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath $supportedApkManifest | ConvertFrom-Json
+    if ($manifest.schemaVersion -ne 1) {
+        throw 'Unsupported supported_apks.json schema.'
+    }
+    $supportedMatches = @($manifest.apks | Where-Object { $_.sha256 -eq $inputHash })
+    if ($supportedMatches.Count -ne 1) {
+        throw "The complete APK SHA-256 is not in supported_apks.json: $inputHash"
+    }
+    $supportedApk = $supportedMatches[0]
+    $expectedPackage = [string]$supportedApk.package
+    $expectedSigner = [string]$supportedApk.signerSha256
+    $expectedTranslation = [string]$supportedApk.translationBundleSha256
+    $expectedGadget = [string]$supportedApk.gadgetSha256
     $inputIdentity = Get-ApkIdentity -Path $stagedInput
     if ($inputIdentity.Package -ne $expectedPackage) {
         throw "Unsupported APK package: $($inputIdentity.Package)"
+    }
+    if ($inputIdentity.VersionCode -ne [string]$supportedApk.versionCode -or
+        $inputIdentity.VersionName -ne [string]$supportedApk.versionName) {
+        throw "Unsupported APK version: $($inputIdentity.VersionName) ($($inputIdentity.VersionCode))"
     }
     $inputSigner = Get-ApkSigner -Path $stagedInput
     if ($inputSigner -ne $expectedSigner) {

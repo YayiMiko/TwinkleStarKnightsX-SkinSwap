@@ -1,6 +1,6 @@
 # 闪耀星骑士通常攻击演出成人变身动画替换 MOD
 
-本 MOD 会将《闪耀星骑士》中角色发动“通常攻击 1”和“通常攻击 2”时出现的角色演出替换为该角色的高画质成人变身动画（R18）。当前提供 PC 正式版和 Android 0.2.0 Dev 测试版。它不会改变实际攻击动作、伤害或战斗速度。
+本 MOD 会将《闪耀星骑士》中角色发动“通常攻击 1”和“通常攻击 2”时出现的角色演出替换为该角色的高画质成人变身动画（R18）。当前提供 PC 正式版和 Android 0.2.1 Dev 测试版。它不会改变实际攻击动作、伤害或战斗速度。
 
 目前两种通常攻击都会生效；后续可能开发仅在“通常攻击 2”时生效的可选版本。
 
@@ -26,15 +26,15 @@
 
 已经安装 PC 旧版的用户无需卸载：下载并完整解压 1.2.0，用新的 `TskSkinSwap` 文件夹覆盖原文件夹，然后在游戏关闭时再次运行 `Apply-TskSkinSwap.bat` 即可。已经下载且仍然有效的资源会继续复用。
 
-### Android 版 0.2.0（Dev 测试版）
+### Android 版 0.2.1（Dev 测试版）
 
-[下载 Android 0.2.0 Dev 测试版](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260713.1)
+[下载 Android 0.2.1 Dev 测试版](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260714.1)
 
-新安装器兼容公开的标准兼容安卓安装包，能够保留汉化和手机上的大型游戏数据，并自动补齐缺失变身资源。已在 vivo X100 Pro（Android 16）完成通常攻击 1 和 2、连续击杀、图鉴预览后进入战斗、场景切换、完整重启及卸载恢复测试。使用前请阅读 [Android 版说明](README.android.md)。
+新安装器只接受经过完整文件校验的标准兼容安卓安装包，能够保留汉化和手机上的大型游戏数据，并自动补齐缺失变身资源。已在 vivo X100 Pro（Android 16）完成通常攻击 1 和 2、连续击杀、图鉴预览后进入战斗、场景切换及完整重启测试。使用前请阅读 [Android 版说明](README.android.md)。
 
 ## 游戏更新后
 
-先正常启动游戏一次并完成更新，然后关闭游戏，重新运行对应版本的安装 BAT。PC 版运行 `Apply-TskSkinSwap.bat`，Android 版连接并授权手机后运行 `Apply-TskSkinSwap-Android.bat`。仍然有效的资源会继续复用。
+先正常启动游戏一次并完成更新，然后关闭游戏，重新运行对应版本的安装 BAT。PC 版运行 `Apply-TskSkinSwap.bat`，Android 版连接并授权手机后运行 `Apply-TskSkinSwap-Android.bat`。Android 旧配置在检测到游戏更新后会自动停用；仍然有效的资源会继续复用。
 
 ## 常见问题
 

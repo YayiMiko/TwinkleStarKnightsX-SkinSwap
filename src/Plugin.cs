@@ -15,7 +15,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "com.codex.tskskinswap";
     public const string PluginName = "TSK Skin Swap";
-    public const string PluginVersion = "1.2.0";
+    public const string PluginVersion = "1.2.1";
 
     internal static ManualLogSource PluginLog { get; private set; } = null!;
 
@@ -108,6 +108,7 @@ internal static class SkinSwapRuntime
 {
     private static readonly HashSet<string> ExcludedCharacterIds = new(StringComparer.Ordinal) { "1141001" };
     private static readonly HashSet<string> FailedCharacters = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, int> FailureCounts = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, CharacterMapping> Mappings = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, PreparedTransform> PreparedTransforms = new(StringComparer.Ordinal);
     private static readonly Dictionary<int, Queue<OverrideRequest>> ActiveOverrides = new();
@@ -119,6 +120,7 @@ internal static class SkinSwapRuntime
     {
         Mappings.Clear();
         FailedCharacters.Clear();
+        FailureCounts.Clear();
         var path = Path.Combine(Paths.ConfigPath, "TskSkinSwap", "mappings.json");
         if (!File.Exists(path))
         {
@@ -339,6 +341,7 @@ internal static class SkinSwapRuntime
                 }
 
                 requests.Enqueue(request);
+                FailureCounts.Remove(characterId);
                 RuntimeFileLog.Write(
                     $"OVERRIDE_REGISTERED character={characterId} asset={sourceAsset.name} "
                     + $"instance={sourceAsset.GetInstanceID()} queue={requests.Count}"
@@ -346,9 +349,18 @@ internal static class SkinSwapRuntime
             }
             catch (Exception exception)
             {
-                FailedCharacters.Add(characterId);
+                var failureCount = FailureCounts.GetValueOrDefault(characterId) + 1;
+                FailureCounts[characterId] = failureCount;
+                var disabled = failureCount >= 3;
+                if (disabled)
+                {
+                    FailedCharacters.Add(characterId);
+                }
                 Plugin.PluginLog.LogError($"Failed to register Cutin override for character {characterId}: {exception}");
-                RuntimeFileLog.Write($"OVERRIDE_REGISTER_FAILED character={characterId} disabledForSession=true: {exception}");
+                RuntimeFileLog.Write(
+                    $"OVERRIDE_REGISTER_FAILED character={characterId} failures={failureCount} "
+                    + $"disabledForSession={disabled}: {exception}"
+                );
             }
         }
     }
