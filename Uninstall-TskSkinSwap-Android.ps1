@@ -6,50 +6,31 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 $toolRoot = $PSScriptRoot
-$adbCandidates = @(
-    (Join-Path $toolRoot '.tools\android-installer\platform-tools\adb.exe'),
-    (Join-Path $toolRoot '.tools\android\platform-tools\adb.exe')
-)
-$adbExe = $adbCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $adbExe) {
-    $systemAdb = Get-Command adb.exe -ErrorAction SilentlyContinue
-    if ($systemAdb) { $adbExe = $systemAdb.Source }
+$commonTools = Join-Path $toolRoot 'Android-Tools.ps1'
+if (-not (Test-Path $commonTools)) {
+    throw 'Android-Tools.ps1 is missing. Extract the entire release ZIP and retry.'
 }
-if (-not $adbExe) {
-    throw 'ADB was not found. Run Apply-TskSkinSwap-Android.bat once, then retry.'
-}
+. $commonTools
+
 if ($Package -notmatch '^[A-Za-z0-9._]+$') {
     throw 'Invalid Android package name.'
 }
+$adbExe = Get-TskAndroidAdb -ToolRoot $toolRoot
 
 if ((& $adbExe get-state 2>$null) -ne 'device') {
-    throw 'No authorized Android device is connected.'
+    throw 'No authorized Android device is connected. Unlock the phone and allow USB debugging.'
+}
+$devices = @(& $adbExe devices | Select-String -Pattern "\tdevice$")
+if ($devices.Count -ne 1) {
+    throw "Exactly one authorized Android device is required; found $($devices.Count)."
 }
 if (-not ((& $adbExe shell pm path $Package 2>$null) -like 'package:*')) {
     throw "Android package is not installed: $Package"
 }
 
-$apkCache = Join-Path $toolRoot '.tools\android-installer\apk'
-$metadataPath = Join-Path $apkCache 'source-apk.json'
-if (-not (Test-Path $metadataPath)) {
-    throw 'The original compatible APK cache is missing. Run the current Android installer once, then retry.'
-}
-$metadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
-if ($metadata.schemaVersion -ne 1 -or
-    $metadata.assetName -notmatch '^Kurusuta-X\.Mod_[0-9.]+_patched\.apk$' -or
-    $metadata.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
-    [string]$metadata.versionCode -notmatch '^\d+$') {
-    throw 'The cached compatible APK metadata is invalid.'
-}
-$sourceApk = Join-Path $apkCache $metadata.assetName
-if (-not (Test-Path $sourceApk)) {
-    throw 'The cached compatible APK is missing. Run the current Android installer once, then retry.'
-}
-$sourceHash = (Get-FileHash -LiteralPath $sourceApk -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($sourceHash -ne $metadata.sha256.ToLowerInvariant()) {
-    throw 'The cached compatible APK failed SHA-256 validation.'
-}
 $packageDetails = & $adbExe shell dumpsys package $Package
 $versionCodeLine = $packageDetails | Where-Object { $_ -match '^\s*versionCode=(\d+)' } | Select-Object -First 1
 if (-not $versionCodeLine) {
@@ -57,8 +38,12 @@ if (-not $versionCodeLine) {
 }
 [void]($versionCodeLine -match '^\s*versionCode=(\d+)')
 $installedVersionCode = $Matches[1]
+$pythonExe = Get-TskAndroidPython -ToolRoot $toolRoot
+$source = Get-TskCompatibleSourceApk -ToolRoot $toolRoot -PythonExe $pythonExe
+$metadata = $source.Metadata
+$sourceApk = $source.Path
 if ($installedVersionCode -ne [string]$metadata.versionCode) {
-    throw 'The cached compatible APK does not match the installed game version. Apply a current TskSkinSwap package before uninstalling.'
+    throw 'The compatible APK does not match the installed game version. Use a TskSkinSwap package that supports the installed version.'
 }
 
 $filesRoot = "/sdcard/Android/data/$Package/files"
@@ -81,4 +66,9 @@ if ($RemoveBundles) {
 
 if (-not $NoRestart) {
     & $adbExe shell "monkey -p $Package -c android.intent.category.LAUNCHER 1 >/dev/null" | Out-Null
+    Start-Sleep -Seconds 2
+    $gamePid = (& $adbExe shell pidof $Package).Trim()
+    if (-not $gamePid) {
+        throw 'Restore finished, but the game did not start on the phone.'
+    }
 }

@@ -1,8 +1,8 @@
 # 闪耀星骑士 Android 动画替换 MOD
 
-## Android 0.2.1 Dev 测试版
+## Android 0.2.2 Dev 测试版
 
-当前测试版已经能够配合公开的兼容安卓安装包工作，并完成完整真机验证。请下载 [Android 0.2.1 Dev 测试版](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260714.1)，不要继续使用先前的 Android 安装器。
+当前测试版已经能够配合公开的兼容安卓安装包工作，并完成完整真机验证。请下载 [Android 0.2.2 Dev 测试版](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260714.2)，不要继续使用先前的 Android 安装器。
 
 新方案会由电脑自动完成以下操作：
 
@@ -26,4 +26,4 @@
 
 游戏更新后，旧配置会自动停用。请先启动游戏完成更新，再关闭游戏并重新运行 BAT。有效的游戏缓存、MOD 资源和电脑下载会继续复用；下载中断时也可以直接重新运行。
 
-需要恢复时，连接并授权手机后运行 `Uninstall-TskSkinSwap-Android.bat`。工具会覆盖恢复未内置本 MOD 的标准兼容安卓安装包，默认保留已下载变身资源，方便以后重新安装。
+需要恢复时，完整解压当前测试包，连接并授权手机后运行 `Uninstall-TskSkinSwap-Android.bat`。卸载工具可以独立准备 ADB 和恢复用的标准兼容安卓安装包，不要求先在同一文件夹运行安装器；首次运行可能需要下载约 250 MB。恢复完成时手机上的游戏也会自动启动。默认保留已下载变身资源，方便以后重新安装。
