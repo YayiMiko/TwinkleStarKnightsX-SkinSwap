@@ -1,6 +1,6 @@
 # 闪耀星骑士通常攻击演出成人变身动画替换 MOD
 
-本 MOD 会将《闪耀星骑士》中角色发动“通常攻击 1”和“通常攻击 2”时出现的角色演出替换为该角色的高画质成人变身动画（R18）。当前提供 PC 和 Android 正式版。它不会改变实际攻击动作、伤害或战斗速度。
+本 MOD 会将《闪耀星骑士》中角色发动“通常攻击 1”和“通常攻击 2”时出现的角色演出替换为该角色的高画质成人变身动画（R18）。当前提供 PC 正式版和 Android 0.2.7 Dev 测试版。它不会改变实际攻击动作、伤害或战斗速度。
 
 目前两种通常攻击都会生效；后续可能开发仅在“通常攻击 2”时生效的可选版本。
 
@@ -26,9 +26,9 @@
 
 已经安装 PC 旧版的用户无需卸载：下载并完整解压 1.2.2，用新的 `TskSkinSwap` 文件夹覆盖原文件夹，然后在游戏关闭时再次运行 `Apply-TskSkinSwap.bat` 即可。已经下载且仍然有效的资源会继续复用。
 
-### Android 版 Release 0.2.6
+### Android 版 0.2.7（Dev 测试版）
 
-[下载 Android 版 Release 0.2.6](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.6)
+[下载 Android 0.2.7 Dev 测试版](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260714.7)
 
 Android 版会自动准备所需文件，保留汉化和手机上的大型游戏数据，并只补齐缺失的变身资源。已在 Android 16 真机完成通常攻击 1 和 2、连续击杀、图鉴预览后进入战斗、场景切换及完整重启测试。使用前请阅读 [Android 版说明](README.android.md)。
 

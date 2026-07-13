@@ -2,7 +2,7 @@
 
 ## Current Status
 
-The public-APK-compatible installer passed the complete device regression checklist on Android 16. Android 0.2.6 is the current formal Android release.
+Android 0.2.7 is distributed as a Dev prerelease while synchronous transform loading is validated on device.
 
 ## Installation Architecture
 
