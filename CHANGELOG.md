@@ -1,5 +1,10 @@
 # 更新记录
 
+## Android Dev 0.2.6 - 2026-07-14
+
+- Platform Tools 下载改用多个 Google 官方地址；连接失败或超时后自动切换，解决部分网络访问 `dl.google.com` 时无限等待的问题。
+- 所有候选地址共享同一个固定 SHA-256，下载内容不匹配时不会执行。
+
 ## Android Dev 0.2.5 - 2026-07-14
 
 - Windows ADB 升级到 Platform Tools 37.0.1；该版本更换了 Windows USB 后端，以规避已观察到的 37.0.0 原生崩溃。

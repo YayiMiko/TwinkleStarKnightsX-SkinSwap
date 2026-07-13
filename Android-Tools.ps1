@@ -5,7 +5,7 @@ $script:TskPythonHash = '4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a
 
 function Get-TskVerifiedRemoteFile {
     param(
-        [Parameter(Mandatory = $true)][string]$Uri,
+        [Parameter(Mandatory = $true)][string[]]$Uri,
         [Parameter(Mandatory = $true)][string]$Destination,
         [Parameter(Mandatory = $true)][string]$ExpectedHash
     )
@@ -20,17 +20,23 @@ function Get-TskVerifiedRemoteFile {
 
     $temporary = "$Destination.part"
     Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
-    Write-Host "Downloading $Uri"
-    try {
-        Invoke-WebRequest -UseBasicParsing -Uri $Uri -OutFile $temporary
-        $actual = (Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($actual -ne $ExpectedHash) {
-            throw "Downloaded file failed SHA-256 validation: $Uri"
+    $failures = @()
+    foreach ($candidate in $Uri) {
+        Write-Host "Downloading $candidate"
+        try {
+            Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri $candidate -OutFile $temporary
+            $actual = (Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $ExpectedHash) {
+                throw "Downloaded file failed SHA-256 validation: $candidate"
+            }
+            Move-Item -LiteralPath $temporary -Destination $Destination
+            return
+        } catch {
+            $failures += "${candidate}: $($_.Exception.Message)"
+            Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
         }
-        Move-Item -LiteralPath $temporary -Destination $Destination
-    } finally {
-        Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
     }
+    throw "All verified download sources failed:`n$($failures -join "`n")"
 }
 
 function Get-TskAndroidAdb {
@@ -56,7 +62,11 @@ function Get-TskAndroidAdb {
 
     $platformToolsZip = Join-Path $toolsRoot "platform-tools-$script:TskPlatformToolsVersion-windows.zip"
     Get-TskVerifiedRemoteFile `
-        -Uri "https://dl.google.com/android/repository/platform-tools_r$script:TskPlatformToolsVersion-win.zip" `
+        -Uri @(
+            "https://dl-ssl.google.com/android/repository/platform-tools_r$script:TskPlatformToolsVersion-win.zip",
+            "https://redirector.gvt1.com/edgedl/android/repository/platform-tools_r$script:TskPlatformToolsVersion-win.zip",
+            "https://dl.google.com/android/repository/platform-tools_r$script:TskPlatformToolsVersion-win.zip"
+        ) `
         -Destination $platformToolsZip `
         -ExpectedHash $script:TskPlatformToolsHash
     if (Test-Path $platformToolsRoot) {
