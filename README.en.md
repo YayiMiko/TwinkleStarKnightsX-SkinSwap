@@ -8,16 +8,16 @@ Lulu (`[炎宿せし宝石] ルルゥ`, internal ID `1141001`) is currently excl
 
 [简体中文](README.md)
 
-## PC Release 1.1.2
+## PC Release 1.1.3
 
-1. Download `TskSkinSwap-PC-v1.1.2.zip` from [PC Release 1.1.2](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/pc-v1.1.2).
+1. Download `TskSkinSwap-PC-v1.1.3.zip` from [PC Release 1.1.3](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/pc-v1.1.3).
 2. Extract `TskSkinSwap` to `<game>/mods/TskSkinSwap/`.
 3. Close the game and double-click `Apply-TskSkinSwap.bat`.
 4. Start the game after `Completed successfully` appears.
 
 The first installation downloads about 2 GB. Run the BAT again after a game update.
 
-To upgrade from an older PC release, you do not need to uninstall it. Close the game, replace the old `TskSkinSwap` folder with the fully extracted 1.1.2 folder, and run the new `Apply-TskSkinSwap.bat`. Existing valid downloads will be reused.
+To upgrade from an older PC release, you do not need to uninstall it. Close the game, replace the old `TskSkinSwap` folder with the fully extracted 1.1.3 folder, and run the new `Apply-TskSkinSwap.bat`. Existing valid downloads will be reused.
 
 ## Android Edition Paused
 
