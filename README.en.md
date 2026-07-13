@@ -1,6 +1,6 @@
 # Twinkle Star Knights Normal Attack Cutin Mod
 
-This mod replaces the character cutin shown during both Normal Attack 1 and Normal Attack 2 with the supported character's high-quality R18 transformation animation. It does not change the actual attack action, damage, or battle speed. Formal releases are available for PC and Android.
+This mod replaces the character cutin shown during both Normal Attack 1 and Normal Attack 2 with the supported character's high-quality R18 transformation animation. It does not change the actual attack action, damage, or battle speed. The PC edition has a formal release; Android 0.2.7 is currently a Dev test release.
 
 A future optional edition may limit the replacement to Normal Attack 2 only.
 
@@ -19,9 +19,9 @@ The release includes the compiled plugin and does not require a .NET SDK. The fi
 
 To upgrade from an older PC release, you do not need to uninstall it. Close the game, replace the old `TskSkinSwap` folder with the fully extracted 1.2.2 folder, and run the new `Apply-TskSkinSwap.bat`. Existing valid downloads will be reused.
 
-## Android Release 0.2.6
+## Android 0.2.7 Dev Test Release
 
-The Android installer prepares the required files automatically while preserving the translation and existing game data. It has completed device testing on Android 16. See [the Android instructions](README.android.md) before using [Android Release 0.2.6](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.6).
+The Android installer prepares the required files automatically while preserving the translation and existing game data. See [the Android instructions](README.android.md) before using the [Android 0.2.7 Dev release](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260714.7).
 
 ## Uninstall
 
