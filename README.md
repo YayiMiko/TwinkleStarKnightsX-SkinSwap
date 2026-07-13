@@ -4,7 +4,7 @@
 
 目前两种通常攻击都会生效；后续可能开发仅在“通常攻击 2”时生效的可选版本。
 
-当前不支持露露（`[炎宿せし宝石] ルルゥ`，内部 ID `1141001`）。PC 和 Android 版都会跳过该角色，通常攻击时继续使用游戏原始演出。
+当前不支持露露（`[炎宿せし宝石] ルルゥ`）。PC 和 Android 版都会跳过该角色，通常攻击时继续使用游戏原始演出。
 
 游戏动画资源不会包含在下载包中。安装工具会根据你的游戏版本获取所需资源，并尽量复用已经下载的内容。
 
@@ -26,11 +26,13 @@
 
 已经安装 PC 旧版的用户无需卸载：下载并完整解压 1.2.2，用新的 `TskSkinSwap` 文件夹覆盖原文件夹，然后在游戏关闭时再次运行 `Apply-TskSkinSwap.bat` 即可。已经下载且仍然有效的资源会继续复用。
 
-### Android 版 0.2.8（Dev 测试版）
+### Android 版 Release 0.2.8
 
-[下载 Android 0.2.8 Dev 测试版](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260714.8)
+[下载 Android 版 Release 0.2.8](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.8)
 
 Android 版会自动准备所需文件，保留汉化和手机上的大型游戏数据，并只补齐缺失的变身资源。已在 Android 16 真机完成通常攻击 1 和 2、连续击杀、图鉴预览后进入战斗、场景切换及完整重启测试。使用前请阅读 [Android 版说明](README.android.md)。
+
+当前 Android 正式版仍需 Windows 电脑、数据线和 USB 调试。无需电脑、直接在安卓手机上完成安装与更新的版本正在开发中。
 
 ## 游戏更新后
 

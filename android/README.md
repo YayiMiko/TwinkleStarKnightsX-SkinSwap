@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Android 0.2.8 is distributed as a Dev prerelease while restored object retention is validated on device.
+Android 0.2.8 is the current formal Android release. A phone-only installer is under development; the current release still requires a Windows PC and USB debugging.
 
 ## Installation Architecture
 

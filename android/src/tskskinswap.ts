@@ -34,6 +34,7 @@ const transformDataByCharacter = new Map<string, Il2Cpp.Object>();
 const pendingAssets = new Map<string, PendingAsset>();
 const completionScheduled = new Set<string>();
 const cutinAssetClones = new Map<string, Il2Cpp.Object>();
+const retainedObjects: Il2Cpp.Object[] = [];
 const excludedCharacterIds = new Set(["1141001"]);
 
 let root = fallbackRoot;
@@ -122,6 +123,7 @@ function loadBundle(path: string): Il2Cpp.Object {
     throw new Error(`Unable to load bundle: ${path}`);
   }
   loadedBundles.set(path, bundle);
+  retainedObjects.push(bundle);
   return bundle;
 }
 
@@ -160,6 +162,7 @@ function ensureAnimationAliases(skeletonData: Il2Cpp.Object, characterId: string
     const duration = source.method("get_Duration").invoke() as number;
     alias.method(".ctor", 3).invoke(Il2Cpp.string(aliasName), timelines, duration);
     animations.method("Add", 1).invoke(alias);
+    retainedObjects.push(alias);
     appendLog(`Added animation alias ${characterId} ${aliasName}->${animationName(source)}`);
   }
 }
@@ -225,6 +228,7 @@ function activateManager(handle: string): void {
   for (const path of Array.from(loadedBundles.keys())) {
     releaseBundle(path, true);
   }
+  retainedObjects.length = 0;
   appendLog(`Activated Cutin manager ${handle}; generation=${assetGeneration}.`);
 }
 
@@ -253,6 +257,7 @@ function beginTransformLoad(mapping: CharacterMapping): void {
     throw error;
   }
   pendingAssets.set(mapping.characterId, { mapping, request, generation: assetGeneration });
+  retainedObjects.push(request);
   appendLog(`Started transform asset load for character ${mapping.characterId}.`);
 }
 
@@ -286,6 +291,7 @@ function finalizeTransformLoad(mapping: CharacterMapping, generation: number): b
   ensureAnimationAliases(transformData, mapping.characterId);
   transformAssets.set(mapping.characterId, transformAsset);
   transformDataByCharacter.set(mapping.characterId, transformData);
+  retainedObjects.push(transformAsset, transformData);
   pendingAssets.delete(mapping.characterId);
   releaseBundle(mapping.transformBundle, false);
   appendLog(`Released transform bundle container for character ${mapping.characterId}.`);
@@ -421,6 +427,7 @@ Il2Cpp.perform(() => {
             }
             cutinClone.method("InitializeWithData", 1).invoke(transformData);
             cutinAssetClones.set(cloneKey, cutinClone);
+            retainedObjects.push(cutinClone);
             appendLog(
               `Prepared Cutin clone for ${characterId}; originalScale=${originalCutin.field<number>("scale").value} transformScale=${transformAsset.field<number>("scale").value} originalSize=${originalData.method("get_Width").invoke()}x${originalData.method("get_Height").invoke()} transformSize=${transformData.method("get_Width").invoke()}x${transformData.method("get_Height").invoke()}.`,
             );
