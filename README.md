@@ -10,21 +10,21 @@
 
 ## 选择版本
 
-### PC 版 Release 1.1.3
+### PC 版 Release 1.2.0
 
 适用于 Windows PC 版游戏，提供一键安装、更新和卸载。
 
-[下载 PC 版 Release 1.1.3](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/pc-v1.1.3)
+[下载 PC 版 Release 1.2.0](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/pc-v1.2.0)
 
-1. 下载 `TskSkinSwap-PC-v1.1.3.zip` 并完整解压。
+1. 下载 `TskSkinSwap-PC-v1.2.0.zip` 并完整解压。
 2. 如果游戏目录下没有 `mods` 文件夹，请自行新建一个。
 3. 将解压出的 `TskSkinSwap` 文件夹放到 `<游戏目录>\mods\TskSkinSwap\`。
 4. 完全关闭游戏，进入该 `TskSkinSwap` 文件夹，双击里面的 `Apply-TskSkinSwap.bat`。
 5. 显示 `Completed successfully` 后启动游戏。
 
-首次安装约需下载 1.2 GB。详细说明见 [PC 版使用说明](README.pc.md)。
+首次安装约需下载 1 GB。详细说明见 [PC 版使用说明](README.pc.md)。
 
-已经安装 PC 旧版的用户无需卸载：下载并完整解压 1.1.3，用新的 `TskSkinSwap` 文件夹覆盖原文件夹，然后在游戏关闭时再次运行 `Apply-TskSkinSwap.bat` 即可。已经下载且仍然有效的资源会继续复用。
+已经安装 PC 旧版的用户无需卸载：下载并完整解压 1.2.0，用新的 `TskSkinSwap` 文件夹覆盖原文件夹，然后在游戏关闭时再次运行 `Apply-TskSkinSwap.bat` 即可。已经下载且仍然有效的资源会继续复用。
 
 ### Android 版（暂停提供）
 
