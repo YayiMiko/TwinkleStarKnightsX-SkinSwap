@@ -1,8 +1,8 @@
 # 闪耀星骑士 Android 动画替换 MOD
 
-## Android 0.2.7 Dev 测试版
+## Android 0.2.8 Dev 测试版
 
-当前 Android 版仍在测试。请下载 [Android 0.2.7 Dev 测试版](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260714.7)，不要继续使用先前的 Android 安装器。
+当前 Android 版仍在测试。请下载 [Android 0.2.8 Dev 测试版](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-dev-20260714.8)，不要继续使用先前的 Android 安装器。
 
 新方案会由电脑自动完成以下操作：
 
