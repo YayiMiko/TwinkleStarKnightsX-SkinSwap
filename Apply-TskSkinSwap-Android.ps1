@@ -16,11 +16,8 @@ if (-not (Test-Path $commonTools)) {
 }
 . $commonTools
 
-$toolsRoot = Join-Path $toolRoot '.tools\android-installer'
 $installer = Join-Path $toolRoot 'android\installer.py'
 $apkBuilder = Join-Path $toolRoot 'Build-TskSkinSwap-AndroidApk.ps1'
-$apkCache = Join-Path $toolsRoot 'apk'
-$supportedApkManifest = Join-Path $toolRoot 'android\supported_apks.json'
 $patchedApk = Join-Path $toolRoot '.tools\android-output\TskSkinSwap-Android-current-patched.apk'
 $releaseRuntime = Join-Path $toolRoot 'android\runtime\tskskinswap.js'
 $developmentRuntime = Join-Path $toolRoot 'android\dist\tskskinswap.js'
@@ -61,29 +58,69 @@ $catalogReady = & $adbExe shell "if [ -f '$catalog' ]; then echo READY; fi"
 if ($catalogReady -ne 'READY') {
     throw 'Launch the game on the phone, finish its initial data download, close it, and run this BAT again.'
 }
+$packageDetails = & $adbExe shell dumpsys package $package
+$versionLine = $packageDetails | Where-Object { $_ -match '^\s*versionName=(\S+)\s*$' } | Select-Object -First 1
+if (-not $versionLine -or $versionLine -notmatch '^\s*versionName=(\S+)\s*$') {
+    throw 'Unable to read the installed Android game version.'
+}
+$installedPackageVersion = $Matches[1]
+
+function Install-TskPatchedApk {
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $adbExe install -r $patchedApk 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($exitCode -ne 0) {
+        $reason = ($output | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+        throw "ADB refused the patched APK. The existing app was not uninstalled.`n$reason"
+    }
+    $output | Write-Host
+}
+
+function Start-TskAndroidGame {
+    & $adbExe shell "monkey -p $package -c android.intent.category.LAUNCHER 1 >/dev/null" | Out-Null
+    Start-Sleep -Seconds 2
+    $gamePid = (& $adbExe shell pidof $package).Trim()
+    if (-not $gamePid) {
+        throw 'Installation finished, but the game did not start on the phone.'
+    }
+}
 
 if (-not $DryRun) {
     if ($SourceApk) {
         $resolvedSourceApk = (Resolve-Path $SourceApk).Path
+        $targetPackageVersion = $installedPackageVersion
     } else {
-        $source = Get-TskCompatibleSourceApk -ToolRoot $toolRoot -PythonExe $pythonExe
+        $source = Get-TskCompatibleSourceApk `
+            -ToolRoot $toolRoot `
+            -PythonExe $pythonExe `
+            -MinimumVersionName $installedPackageVersion
         $resolvedSourceApk = $source.Path
+        $targetPackageVersion = [string]$source.Metadata.versionName
     }
-    $sourceHash = (Get-FileHash -LiteralPath $resolvedSourceApk -Algorithm SHA256).Hash.ToLowerInvariant()
-    $supportedDocument = Get-Content -Raw -Encoding UTF8 -LiteralPath $supportedApkManifest | ConvertFrom-Json
-    $supportedMatches = @($supportedDocument.apks | Where-Object { $_.sha256 -eq $sourceHash })
-    if ($supportedDocument.schemaVersion -ne 1 -or $supportedMatches.Count -ne 1) {
-        throw "The complete APK SHA-256 is not supported: $sourceHash"
-    }
-    $targetPackageVersion = [string]$supportedMatches[0].versionName
     & $apkBuilder `
         -InputApk $resolvedSourceApk `
         -OutputApk $patchedApk `
         -RuntimeScript $runtime `
+        -ExpectedVersionName $targetPackageVersion `
         -SkipRuntimeBuild `
         -Adb $adbExe
     if ($LASTEXITCODE -ne 0) { throw 'Compatible APK patching or installation failed.' }
     & $adbExe shell am force-stop $package | Out-Null
+
+    if ([version]$targetPackageVersion -gt [version]$installedPackageVersion) {
+        Install-TskPatchedApk
+        Start-TskAndroidGame
+        Write-Host ''
+        Write-Host 'The compatible Android app was updated to the latest version.'
+        Write-Host 'On the phone, finish the in-game update.'
+        Write-Host 'Then close the game and run Apply-TskSkinSwap-Android.bat again to finish the MOD.'
+        exit 10
+    }
 }
 
 $arguments = @(
@@ -108,16 +145,8 @@ if ($installerExitCode -ne 0 -or $DryRun) {
     exit $installerExitCode
 }
 
-& $adbExe install -r $patchedApk
-if ($LASTEXITCODE -ne 0) {
-    throw 'ADB refused the patched APK. The existing app was not uninstalled.'
-}
+Install-TskPatchedApk
 if (-not $NoRestart) {
-    & $adbExe shell "monkey -p $package -c android.intent.category.LAUNCHER 1 >/dev/null" | Out-Null
-    Start-Sleep -Seconds 2
-    $gamePid = (& $adbExe shell pidof $package).Trim()
-    if (-not $gamePid) {
-        throw 'Installation finished, but the game did not start on the phone.'
-    }
+    Start-TskAndroidGame
 }
 Write-Host 'Android MOD installation completed without clearing application data.'

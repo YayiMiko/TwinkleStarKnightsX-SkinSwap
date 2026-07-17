@@ -97,6 +97,37 @@ class AndroidApkPatcherTests(unittest.TestCase):
                     SCRIPT_ENTRY,
                     encode_bundle("/src/translation.js", b"translation();"),
                 )
+
+    def test_patch_rejects_unexpected_translation_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.apk"
+            runtime = root / "runtime.js"
+            output = root / "output.apk"
+            runtime.write_bytes(encode_bundle("/src/runtime.js", b"runtime();"))
+            config = json.dumps(
+                {
+                    "interaction": {
+                        "type": "script",
+                        "path": Path(SCRIPT_ENTRY).name,
+                    }
+                }
+            ).encode()
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr(CONFIG_ENTRY, config)
+                archive.writestr(
+                    SCRIPT_ENTRY,
+                    encode_bundle("/src/unexpected.js", b"translation();"),
+                )
+                archive.writestr(GADGET_ENTRY, b"gadget")
+
+            with self.assertRaisesRegex(ValueError, "translation module"):
+                patch_apk(
+                    source,
+                    runtime,
+                    output,
+                    expected_translation_module="/src/translation.js",
+                )
                 archive.writestr(GADGET_ENTRY, b"gadget")
 
             with self.assertRaisesRegex(ValueError, "unsupported embedded translation"):

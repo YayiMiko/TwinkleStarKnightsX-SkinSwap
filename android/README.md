@@ -2,17 +2,17 @@
 
 ## Current Status
 
-Android 0.2.8 is the current formal Android release. A phone-only installer is under development; the current release still requires a Windows PC and USB debugging.
+Android 0.2.9 Dev dynamically discovers the latest compatible APK. A phone-only installer is under development; the current flow still requires a Windows PC and USB debugging.
 
 ## Installation Architecture
 
 `Apply-TskSkinSwap-Android.bat` now performs the complete PC-assisted flow without root access:
 
-1. Download the latest standard Kurusuta APK from `anosu/DMM-Mod` through the GitHub Release API and validate GitHub's size and SHA-256 metadata.
+1. Query `anosu/DMM-Mod` releases for the newest standard Kurusuta APK and validate the downloaded file against GitHub's size and SHA-256 metadata.
 2. Validate the package name, version, signer, Frida Gadget, and embedded translation script.
 3. Combine the translation and TskSkinSwap Frida bundles in isolated scopes, replace only `lib/arm64-v8a/libfrida-gadget.script.so`, align the APK, and sign it with Objection's pinned, publicly available development key.
-4. Install with `adb install -r`; never uninstall or clear application data.
-5. Reuse valid bundles from `UnityCache/Shared` or MOD storage, download only missing transformation bundles from the catalog's official URLs, write `mappings.json`, and launch the game.
+4. Refuse downgrades. When a newer compatible app is found, install it with `adb install -r`, launch it, and require the user to finish the in-game update before rerunning the BAT.
+5. On the second run, reuse valid bundles from `UnityCache/Shared` or MOD storage, download only missing transformation bundles from the current catalog's official URLs, write `mappings.json`, and launch the game.
 
 APK files, signing tools, game assets, generated mappings, and downloaded bundles remain local and untracked. `-DryRun` inventories the current catalog and cache without patching the APK or downloading resources.
 

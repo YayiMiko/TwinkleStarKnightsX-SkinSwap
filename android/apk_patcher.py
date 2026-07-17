@@ -37,6 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--output-apk", type=Path, required=True)
     parser.add_argument("--expected-translation-sha256")
+    parser.add_argument("--expected-translation-module")
     parser.add_argument("--expected-gadget-sha256")
     return parser.parse_args()
 
@@ -125,6 +126,7 @@ def patch_apk(
     runtime_path: Path,
     output_apk: Path,
     expected_translation_sha256: str | None = None,
+    expected_translation_module: str | None = None,
     expected_gadget_sha256: str | None = None,
 ) -> dict[str, object]:
     input_apk = input_apk.resolve()
@@ -155,6 +157,7 @@ def patch_apk(
             validate_gadget_config(source.read(CONFIG_ENTRY))
             translation_data = source.read(SCRIPT_ENTRY)
             gadget_data = source.read(GADGET_ENTRY)
+            translation_bundle = parse_bundle(translation_data)
             translation_hash = hashlib.sha256(translation_data).hexdigest()
             gadget_hash = hashlib.sha256(gadget_data).hexdigest()
             if expected_translation_sha256 and not secrets_equal_hash(
@@ -162,6 +165,14 @@ def patch_apk(
             ):
                 raise ValueError(
                     f"unsupported embedded translation script: {translation_hash}"
+                )
+            if (
+                expected_translation_module
+                and translation_bundle.module != expected_translation_module
+            ):
+                raise ValueError(
+                    "unsupported embedded translation module: "
+                    f"{translation_bundle.module}"
                 )
             if expected_gadget_sha256 and not secrets_equal_hash(
                 gadget_hash, expected_gadget_sha256
@@ -225,6 +236,7 @@ def main() -> int:
         args.runtime,
         args.output_apk,
         expected_translation_sha256=args.expected_translation_sha256,
+        expected_translation_module=args.expected_translation_module,
         expected_gadget_sha256=args.expected_gadget_sha256,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))

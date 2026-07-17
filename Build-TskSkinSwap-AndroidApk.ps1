@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)][string]$InputApk,
     [string]$OutputApk,
     [string]$RuntimeScript,
+    [string]$ExpectedVersionName,
     [string]$Adb,
     [switch]$SkipRuntimeBuild,
     [switch]$ForcePortableTools,
@@ -201,27 +202,27 @@ New-Item -ItemType Directory -Force -Path $staging | Out-Null
 try {
     Copy-Item -LiteralPath $resolvedInput -Destination $stagedInput
     Copy-Item -LiteralPath $objectionKey -Destination $stagedKey
-    $inputHash = (Get-FileHash -LiteralPath $stagedInput -Algorithm SHA256).Hash.ToLowerInvariant()
     $manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath $supportedApkManifest | ConvertFrom-Json
-    if ($manifest.schemaVersion -ne 1) {
+    if ($manifest.schemaVersion -ne 2) {
         throw 'Unsupported supported_apks.json schema.'
     }
-    $supportedMatches = @($manifest.apks | Where-Object { $_.sha256 -eq $inputHash })
-    if ($supportedMatches.Count -ne 1) {
-        throw "The complete APK SHA-256 is not in supported_apks.json: $inputHash"
+    if ($manifest.sourceRepository -ne 'anosu/DMM-Mod') {
+        throw 'Unsupported APK source repository.'
     }
-    $supportedApk = $supportedMatches[0]
-    $expectedPackage = [string]$supportedApk.package
-    $expectedSigner = [string]$supportedApk.signerSha256
-    $expectedTranslation = [string]$supportedApk.translationBundleSha256
-    $expectedGadget = [string]$supportedApk.gadgetSha256
+    $expectedPackage = [string]$manifest.package
+    $expectedSigner = [string]$manifest.signerSha256
+    $expectedTranslationModule = [string]$manifest.translationModule
+    $expectedGadget = [string]$manifest.gadgetSha256
     $inputIdentity = Get-ApkIdentity -Path $stagedInput
     if ($inputIdentity.Package -ne $expectedPackage) {
         throw "Unsupported APK package: $($inputIdentity.Package)"
     }
-    if ($inputIdentity.VersionCode -ne [string]$supportedApk.versionCode -or
-        $inputIdentity.VersionName -ne [string]$supportedApk.versionName) {
+    if ($inputIdentity.VersionCode -notmatch '^\d+$' -or
+        $inputIdentity.VersionName -notmatch '^\d+(?:\.\d+)*$') {
         throw "Unsupported APK version: $($inputIdentity.VersionName) ($($inputIdentity.VersionCode))"
+    }
+    if ($ExpectedVersionName -and $inputIdentity.VersionName -ne $ExpectedVersionName) {
+        throw "APK version $($inputIdentity.VersionName) does not match expected version $ExpectedVersionName."
     }
     $inputSigner = Get-ApkSigner -Path $stagedInput
     if ($inputSigner -ne $expectedSigner) {
@@ -240,7 +241,7 @@ try {
         '--input-apk', $stagedInput,
         '--runtime', $resolvedRuntime,
         '--output-apk', $unsigned,
-        '--expected-translation-sha256', $expectedTranslation,
+        '--expected-translation-module', $expectedTranslationModule,
         '--expected-gadget-sha256', $expectedGadget
     ) -FailureMessage 'APK script embedding failed.'
 

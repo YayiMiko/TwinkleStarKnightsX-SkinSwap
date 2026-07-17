@@ -33,17 +33,19 @@ if (-not ((& $adbExe shell pm path $Package 2>$null) -like 'package:*')) {
 }
 
 $packageDetails = & $adbExe shell dumpsys package $Package
-$versionCodeLine = $packageDetails | Where-Object { $_ -match '^\s*versionCode=(\d+)' } | Select-Object -First 1
-if (-not $versionCodeLine) {
+$versionNameLine = $packageDetails | Where-Object { $_ -match '^\s*versionName=(\S+)\s*$' } | Select-Object -First 1
+if (-not $versionNameLine -or $versionNameLine -notmatch '^\s*versionName=(\S+)\s*$') {
     throw 'Unable to read the installed Android package version.'
 }
-[void]($versionCodeLine -match '^\s*versionCode=(\d+)')
-$installedVersionCode = $Matches[1]
+$installedVersionName = $Matches[1]
 $pythonExe = Get-TskAndroidPython -ToolRoot $toolRoot
-$source = Get-TskCompatibleSourceApk -ToolRoot $toolRoot -PythonExe $pythonExe
+$source = Get-TskCompatibleSourceApk `
+    -ToolRoot $toolRoot `
+    -PythonExe $pythonExe `
+    -RequiredVersionName $installedVersionName
 $metadata = $source.Metadata
 $sourceApk = $source.Path
-if ($installedVersionCode -ne [string]$metadata.versionCode) {
+if ($installedVersionName -ne [string]$metadata.versionName) {
     throw 'The compatible APK does not match the installed game version. Use a TskSkinSwap package that supports the installed version.'
 }
 

@@ -8,80 +8,78 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "android"))
 
-from apk_source import SourceAsset, SupportedApk, download_asset, select_source_asset  # noqa: E402
+from apk_source import SourceAsset, download_asset, select_source_asset  # noqa: E402
+
+
+def apk_asset(version: str, digest: str = "2" * 64) -> dict[str, object]:
+    return {
+        "name": f"Kurusuta-X.Mod_{version}_patched.apk",
+        "size": 100,
+        "digest": "sha256:" + digest,
+        "browser_download_url": "https://github.com/example/current.apk",
+    }
 
 
 class AndroidApkSourceTests(unittest.TestCase):
-    @staticmethod
-    def supported(sha256: str = "2" * 64) -> SupportedApk:
-        return SupportedApk(
-            release_tag="v2026.07.13",
-            asset_name="Kurusuta-X.Mod_01.03.03_patched.apk",
-            size=100,
-            sha256=sha256,
-            version_name="01.03.03",
-            version_code="195",
-        )
-
-    def test_selects_standard_apk_and_ignores_legacy(self) -> None:
-        release = {
-            "tag_name": "v2026.07.13",
-            "assets": [
-                {
-                    "name": "Kurusuta-X.Mod_01.03.03_patched.legacy.apk",
-                    "size": 90,
-                    "digest": "sha256:" + "1" * 64,
-                    "browser_download_url": "https://github.com/example/legacy.apk",
-                },
-                {
-                    "name": "Kurusuta-X.Mod_01.03.03_patched.apk",
-                    "size": 100,
-                    "digest": "sha256:" + "2" * 64,
-                    "browser_download_url": "https://github.com/example/current.apk",
-                },
-            ],
-        }
-        asset = select_source_asset(release, self.supported())
-        self.assertEqual("Kurusuta-X.Mod_01.03.03_patched.apk", asset.name)
-        self.assertEqual("2" * 64, asset.sha256)
+    def test_selects_latest_standard_apk_and_ignores_legacy(self) -> None:
+        releases = [
+            {
+                "tag_name": "v2026.07.13",
+                "draft": False,
+                "prerelease": False,
+                "assets": [
+                    {
+                        "name": "Kurusuta-X.Mod_01.03.03_patched.legacy.apk",
+                        "size": 90,
+                        "digest": "sha256:" + "1" * 64,
+                        "browser_download_url": "https://github.com/example/legacy.apk",
+                    },
+                    apk_asset("01.03.03"),
+                ],
+            },
+            {
+                "tag_name": "v2026.07.17",
+                "draft": False,
+                "prerelease": False,
+                "assets": [apk_asset("01.03.04", "3" * 64)],
+            },
+        ]
+        asset = select_source_asset(releases)
+        self.assertEqual("Kurusuta-X.Mod_01.03.04_patched.apk", asset.name)
+        self.assertEqual("3" * 64, asset.sha256)
+        self.assertEqual("01.03.04", asset.version_name)
 
     def test_rejects_missing_digest(self) -> None:
-        release = {
-            "tag_name": "v1",
-            "assets": [
-                {
-                    "name": "Kurusuta-X.Mod_01.03.03_patched.apk",
-                    "size": 100,
-                    "browser_download_url": "https://github.com/example/current.apk",
-                }
-            ],
-        }
+        asset = apk_asset("01.03.04")
+        del asset["digest"]
+        releases = [{"tag_name": "v1", "assets": [asset]}]
         with self.assertRaisesRegex(ValueError, "SHA-256"):
-            select_source_asset(release, self.supported())
+            select_source_asset(releases)
 
-    def test_rejects_apk_outside_full_file_allowlist(self) -> None:
-        release = {
-            "tag_name": "v2026.07.13",
-            "assets": [
-                {
-                    "name": "Kurusuta-X.Mod_01.03.03_patched.apk",
-                    "size": 100,
-                    "digest": "sha256:" + "2" * 64,
-                    "browser_download_url": "https://github.com/example/current.apk",
-                }
-            ],
-        }
-        with self.assertRaisesRegex(ValueError, "full-file fingerprint"):
-            select_source_asset(release, self.supported("3" * 64))
+    def test_rejects_downgrade_below_installed_version(self) -> None:
+        releases = [{"tag_name": "v1", "assets": [apk_asset("01.03.03")]}]
+        with self.assertRaisesRegex(ValueError, "installed game is newer"):
+            select_source_asset(releases, "01.03.04")
+
+    def test_selects_exact_installed_version_for_restore(self) -> None:
+        releases = [
+            {"tag_name": "new", "assets": [apk_asset("01.03.04")]},
+            {"tag_name": "old", "assets": [apk_asset("01.03.03")]},
+        ]
+        asset = select_source_asset(
+            releases, required_version_name="01.03.03"
+        )
+        self.assertEqual("01.03.03", asset.version_name)
 
     def test_valid_cached_apk_does_not_open_network(self) -> None:
         payload = b"apk"
         asset = SourceAsset(
-            name="Kurusuta-X.Mod_01.03.03_patched.apk",
+            name="Kurusuta-X.Mod_01.03.04_patched.apk",
             size=len(payload),
             sha256=hashlib.sha256(payload).hexdigest(),
             url="https://github.com/example/current.apk",
             release_tag="v1",
+            version_name="01.03.04",
         )
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / asset.name

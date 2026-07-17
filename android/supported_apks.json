@@ -1,18 +1,8 @@
 {
-  "schemaVersion": 1,
-  "defaultReleaseTag": "v2026.07.13-08.31",
-  "apks": [
-    {
-      "releaseTag": "v2026.07.13-08.31",
-      "assetName": "Kurusuta-X.Mod_01.03.03_patched.apk",
-      "size": 252988932,
-      "sha256": "ab9595647d1aea5196d8fe748ae35a27790428e32edc909aadbe8d4566f32bf0",
-      "package": "jp.co.fanzagames.twinklestarknightsx_a_mod",
-      "versionName": "01.03.03",
-      "versionCode": "195",
-      "signerSha256": "f7697c6633707cd741e11ae28236511b85f51fb6a1f41f4f8c6d1301f46ce0fb",
-      "translationBundleSha256": "f10ec5b90302839f35388eb1820cf757f722ed5b0c076eae99d2a43f3bd8539b",
-      "gadgetSha256": "b02615fd08c005ec69cd8ce46d43a5edff1b21f4269d2ed7719c83c8485a1dac"
-    }
-  ]
+  "schemaVersion": 2,
+  "sourceRepository": "anosu/DMM-Mod",
+  "package": "jp.co.fanzagames.twinklestarknightsx_a_mod",
+  "signerSha256": "f7697c6633707cd741e11ae28236511b85f51fb6a1f41f4f8c6d1301f46ce0fb",
+  "translationModule": "/src/agent_twinklestarknights_mod.js",
+  "gadgetSha256": "b02615fd08c005ec69cd8ce46d43a5edff1b21f4269d2ed7719c83c8485a1dac"
 }

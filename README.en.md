@@ -1,6 +1,6 @@
 # Twinkle Star Knights Normal Attack Cutin Mod
 
-This mod replaces the character cutin shown during both Normal Attack 1 and Normal Attack 2 with the supported character's high-quality R18 transformation animation. It does not change the actual attack action, damage, or battle speed. The PC edition has a formal release; Android 0.2.8 is currently a Dev test release.
+This mod replaces the character cutin shown during both Normal Attack 1 and Normal Attack 2 with the supported character's high-quality R18 transformation animation. It does not change the actual attack action, damage, or battle speed. Formal releases are available for both PC and Android.
 
 A future optional edition may limit the replacement to Normal Attack 2 only.
 

@@ -12,8 +12,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Apply-TskSkinSwap-
 set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.
+if "%EXIT_CODE%"=="10" goto game_data_update
 if not "%EXIT_CODE%"=="0" goto failed
 echo Installation completed. The game has been restarted.
+goto finished
+
+:game_data_update
+set "EXIT_CODE=0"
+echo Compatible app update completed. The game has been started on the phone.
+echo Finish the additional in-game data update, then close the game and run this BAT again.
 goto finished
 
 :failed
