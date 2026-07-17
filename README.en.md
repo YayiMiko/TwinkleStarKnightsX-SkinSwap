@@ -19,11 +19,11 @@ The release includes the compiled plugin and does not require a .NET SDK. The fi
 
 To upgrade from an older PC release, you do not need to uninstall it. Close the game, replace the old `TskSkinSwap` folder with the fully extracted 1.2.2 folder, and run the new `Apply-TskSkinSwap.bat`. Existing valid downloads will be reused.
 
-## Android Release 0.2.8
+## Android Release 0.2.9
 
-The Android installer prepares the required files automatically while preserving the translation and existing game data. See [the Android instructions](README.android.md) before using [Android Release 0.2.8](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.8).
+The Android installer discovers the latest compatible package automatically while preserving the translation and existing game data. See [the Android instructions](README.android.md) before using [Android Release 0.2.9](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.9).
 
-Android 0.2.8 still requires a Windows PC, a USB cable, and USB debugging. A phone-only installer that can install and update the mod without a PC is under development.
+Android 0.2.9 still requires a Windows PC, a USB cable, and USB debugging. A phone-only installer that can install and update the mod without a PC is under development.
 
 ## Uninstall
 

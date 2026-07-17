@@ -26,17 +26,17 @@
 
 已经安装 PC 旧版的用户无需卸载：下载并完整解压 1.2.2，用新的 `TskSkinSwap` 文件夹覆盖原文件夹，然后在游戏关闭时再次运行 `Apply-TskSkinSwap.bat` 即可。已经下载且仍然有效的资源会继续复用。
 
-### Android 版 Release 0.2.8
+### Android 版 Release 0.2.9
 
-[下载 Android 版 Release 0.2.8](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.8)
+[下载 Android 版 Release 0.2.9](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.9)
 
-Android 版会自动准备所需文件，保留汉化和手机上的大型游戏数据，并只补齐缺失的变身资源。已在 Android 16 真机完成通常攻击 1 和 2、连续击杀、图鉴预览后进入战斗、场景切换及完整重启测试。使用前请阅读 [Android 版说明](README.android.md)。
+Android 版会自动查询友仓最新的兼容安装包，保留汉化和手机上的大型游戏数据，并只补齐缺失的变身资源。已完成通常攻击 1 和 2、连续击杀、图鉴预览后进入战斗、场景切换、完整重启及文件夹清理测试。使用前请阅读 [Android 版说明](README.android.md)。
 
 当前 Android 正式版仍需 Windows 电脑、数据线和 USB 调试。无需电脑、直接在安卓手机上完成安装与更新的版本正在开发中。
 
 ## 游戏更新后
 
-先正常启动游戏一次并完成更新，然后关闭游戏，重新运行对应版本的安装 BAT。PC 版运行 `Apply-TskSkinSwap.bat`，Android 版连接并授权手机后运行 `Apply-TskSkinSwap-Android.bat`。Android 旧配置在检测到游戏更新后会自动停用；仍然有效的资源会继续复用。
+PC 版先正常启动游戏完成更新，然后关闭游戏并运行 `Apply-TskSkinSwap.bat`。Android 版连接并授权手机后运行 `Apply-TskSkinSwap-Android.bat`；如果 BAT 先更新了兼容安装包，请在手机游戏内完成更新，关闭游戏后再运行一次 BAT。Android 旧配置在检测到游戏更新后会自动停用，仍然有效的资源会继续复用。
 
 ## 常见问题
 
