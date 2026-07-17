@@ -26,11 +26,11 @@
 
 已经安装 PC 旧版的用户无需卸载：下载并完整解压 1.2.2，用新的 `TskSkinSwap` 文件夹覆盖原文件夹，然后在游戏关闭时再次运行 `Apply-TskSkinSwap.bat` 即可。已经下载且仍然有效的资源会继续复用。
 
-### Android 版 Release 0.2.10
+### Android 版 Release 0.3.0
 
-[下载 Android 版 Release 0.2.10](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.2.10)
+[下载 Android 版 Release 0.3.0](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.3.0)
 
-Android 版会自动查询友仓最新的兼容安装包，保留汉化和手机上的大型游戏数据，并只补齐缺失的变身资源。0.2.10 修复了连续查看角色后攻击动画消失或原生变身动画白屏的问题。使用前请阅读 [Android 版说明](README.android.md)。
+Android 版会自动查询友仓最新的兼容安装包，保留汉化和手机上的大型游戏数据，并只补齐缺失的变身资源。0.3.0 修复了连续查看角色后攻击动画消失或原生变身动画白屏的问题。使用前请阅读 [Android 版说明](README.android.md)。
 
 当前 Android 正式版仍需 Windows 电脑、数据线和 USB 调试。无需电脑、直接在安卓手机上完成安装与更新的版本正在开发中。
 
