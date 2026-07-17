@@ -43,22 +43,48 @@ function Get-TskAndroidAdb {
     param([Parameter(Mandatory = $true)][string]$ToolRoot)
 
     $toolsRoot = Join-Path $ToolRoot '.tools\android-installer'
-    $platformToolsRoot = Join-Path $toolsRoot 'platform-tools'
-    $downloadedAdb = Join-Path $platformToolsRoot 'adb.exe'
-    $developmentAdb = Join-Path $ToolRoot '.tools\android\platform-tools\adb.exe'
-    if (Test-Path $downloadedAdb) {
-        $sourceProperties = Join-Path $platformToolsRoot 'source.properties'
-        if ((Test-Path $sourceProperties) -and
-            ((Get-Content -Raw -LiteralPath $sourceProperties) -match
-                "Pkg.Revision\s*=\s*$([regex]::Escape($script:TskPlatformToolsVersion))")) {
-            return $downloadedAdb
+    $legacyAdbCandidates = @(
+        (Join-Path $toolsRoot 'platform-tools\adb.exe'),
+        (Join-Path $ToolRoot '.tools\android\platform-tools\adb.exe')
+    )
+    foreach ($legacyAdb in $legacyAdbCandidates) {
+        if (Test-Path $legacyAdb) {
+            $previousPreference = $ErrorActionPreference
+            try {
+                $ErrorActionPreference = 'SilentlyContinue'
+                & $legacyAdb kill-server 2>$null | Out-Null
+            } finally {
+                $ErrorActionPreference = $previousPreference
+            }
         }
-        Remove-Item -LiteralPath $platformToolsRoot -Recurse -Force
     }
-    if (Test-Path $developmentAdb) { return $developmentAdb }
 
     $systemAdb = Get-Command adb.exe -ErrorAction SilentlyContinue
     if ($systemAdb) { return $systemAdb.Source }
+
+    $runtimeRoot = Join-Path ([IO.Path]::GetTempPath()) 'TskSkinSwap\android-platform-tools'
+    $platformToolsRoot = Join-Path $runtimeRoot 'platform-tools'
+    $runtimeAdb = Join-Path $platformToolsRoot 'adb.exe'
+    $sourceProperties = Join-Path $platformToolsRoot 'source.properties'
+    if ((Test-Path $runtimeAdb) -and
+        (Test-Path $sourceProperties) -and
+        ((Get-Content -Raw -LiteralPath $sourceProperties) -match
+            "Pkg.Revision\s*=\s*$([regex]::Escape($script:TskPlatformToolsVersion))")) {
+        return $runtimeAdb
+    }
+    if (Test-Path $runtimeAdb) {
+        $previousPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'SilentlyContinue'
+            & $runtimeAdb kill-server 2>$null | Out-Null
+        } finally {
+            $ErrorActionPreference = $previousPreference
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    if (Test-Path $runtimeRoot) {
+        Remove-Item -LiteralPath $runtimeRoot -Recurse -Force
+    }
 
     $platformToolsZip = Join-Path $toolsRoot "platform-tools-$script:TskPlatformToolsVersion-windows.zip"
     Get-TskVerifiedRemoteFile `
@@ -69,18 +95,15 @@ function Get-TskAndroidAdb {
         ) `
         -Destination $platformToolsZip `
         -ExpectedHash $script:TskPlatformToolsHash
-    if (Test-Path $platformToolsRoot) {
-        Remove-Item -LiteralPath $platformToolsRoot -Recurse -Force
-    }
-    Expand-Archive -LiteralPath $platformToolsZip -DestinationPath $toolsRoot -Force
-    $sourceProperties = Join-Path $platformToolsRoot 'source.properties'
-    if (-not (Test-Path $downloadedAdb) -or
+    New-Item -ItemType Directory -Force -Path $runtimeRoot | Out-Null
+    Expand-Archive -LiteralPath $platformToolsZip -DestinationPath $runtimeRoot -Force
+    if (-not (Test-Path $runtimeAdb) -or
         -not (Test-Path $sourceProperties) -or
         -not ((Get-Content -Raw -LiteralPath $sourceProperties) -match
             "Pkg.Revision\s*=\s*$([regex]::Escape($script:TskPlatformToolsVersion))")) {
         throw 'Android Platform Tools extraction failed version validation.'
     }
-    return $downloadedAdb
+    return $runtimeAdb
 }
 
 function Get-TskAndroidPython {

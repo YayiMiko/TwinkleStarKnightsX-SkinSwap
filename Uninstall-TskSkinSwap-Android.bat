@@ -31,6 +31,7 @@ pause
 exit /b %EXIT_CODE%
 
 :stop_bundled_adb
+if exist "%TEMP%\TskSkinSwap\android-platform-tools\platform-tools\adb.exe" "%TEMP%\TskSkinSwap\android-platform-tools\platform-tools\adb.exe" kill-server >nul 2>&1
 if exist "%~dp0.tools\android-installer\platform-tools\adb.exe" "%~dp0.tools\android-installer\platform-tools\adb.exe" kill-server >nul 2>&1
 if exist "%~dp0.tools\android\platform-tools\adb.exe" "%~dp0.tools\android\platform-tools\adb.exe" kill-server >nul 2>&1
 exit /b 0

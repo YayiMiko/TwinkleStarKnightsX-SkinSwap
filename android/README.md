@@ -16,6 +16,8 @@ Android 0.2.9 Dev dynamically discovers the latest compatible APK. A phone-only 
 
 APK files, signing tools, game assets, generated mappings, and downloaded bundles remain local and untracked. `-DryRun` inventories the current catalog and cache without patching the APK or downloading resources.
 
+The packaged ADB client is extracted to `%TEMP%/TskSkinSwap/android-platform-tools/` before use. The ADB server therefore never executes from the release folder, so a lingering daemon cannot prevent that folder from being deleted.
+
 ## Development Commands
 
 ```powershell
