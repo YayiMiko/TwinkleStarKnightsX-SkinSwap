@@ -45,16 +45,14 @@ const loadedBundles = new Map<string, Il2Cpp.Object>();
 const transformAssets = new Map<string, Il2Cpp.Object>();
 const transformDataByCharacter = new Map<string, Il2Cpp.Object>();
 const transformStateByCharacter = new Map<string, Il2Cpp.Object>();
-const transformRetainedObjects = new Map<string, Il2Cpp.Object[]>();
-const transformUsage = new Map<string, number>();
 const pendingAssets = new Map<string, PendingAsset>();
 const completionScheduled = new Set<string>();
 const activeOverrides = new Map<string, OverrideRequest[]>();
 const skeletonOverrideContexts = new WeakMap<object, OverrideRequest>();
 const stateOverrideContexts = new WeakMap<object, OverrideRequest>();
 const completionContexts = new WeakMap<object, Il2Cpp.Object>();
+const retainedObjects: Il2Cpp.Object[] = [];
 const excludedCharacterIds = new Set(["1141001"]);
-const maxTransformCacheEntries = 6;
 
 let root = fallbackRoot;
 let activeManagerHandle = "";
@@ -142,6 +140,7 @@ function loadBundle(path: string): Il2Cpp.Object {
     throw new Error(`Unable to load bundle: ${path}`);
   }
   loadedBundles.set(path, bundle);
+  retainedObjects.push(bundle);
   return bundle;
 }
 
@@ -149,12 +148,11 @@ function animationName(animation: Il2Cpp.Object): string {
   return stringValue(animation.method("get_Name").invoke());
 }
 
-function ensureAnimationAliases(skeletonData: Il2Cpp.Object, characterId: string): Il2Cpp.Object[] {
+function ensureAnimationAliases(skeletonData: Il2Cpp.Object, characterId: string): void {
   const animations = skeletonData.method("get_Animations").invoke() as Il2Cpp.Object;
   const items = animations.field("Items").value as Il2Cpp.Array<Il2Cpp.Object>;
   const count = animations.field<number>("Count").value;
   let source: Il2Cpp.Object | null = null;
-  const aliases: Il2Cpp.Object[] = [];
 
   for (let index = 0; index < count; index += 1) {
     const animation = items.get(index);
@@ -181,10 +179,9 @@ function ensureAnimationAliases(skeletonData: Il2Cpp.Object, characterId: string
     const duration = source.method("get_Duration").invoke() as number;
     alias.method(".ctor", 3).invoke(Il2Cpp.string(aliasName), timelines, duration);
     animations.method("Add", 1).invoke(alias);
-    aliases.push(alias);
+    retainedObjects.push(alias);
     appendLog(`Added animation alias ${characterId} ${aliasName}->${animationName(source)}`);
   }
-  return aliases;
 }
 
 function releaseBundle(path: string, unloadAll: boolean): void {
@@ -253,41 +250,6 @@ function getActiveOverride(asset: Il2Cpp.Object): OverrideRequest | undefined {
   return requests !== undefined && requests.length > 0 ? requests[0] : undefined;
 }
 
-function touchTransform(characterId: string): void {
-  transformUsage.delete(characterId);
-  transformUsage.set(characterId, Date.now());
-}
-
-function isTransformActive(characterId: string): boolean {
-  for (const requests of activeOverrides.values()) {
-    if (requests.some((request) => request.characterId === characterId)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function trimTransformCache(): void {
-  while (transformUsage.size > maxTransformCacheEntries) {
-    let evictionCandidate: string | undefined;
-    for (const characterId of transformUsage.keys()) {
-      if (!isTransformActive(characterId)) {
-        evictionCandidate = characterId;
-        break;
-      }
-    }
-    if (evictionCandidate === undefined) {
-      return;
-    }
-    transformUsage.delete(evictionCandidate);
-    transformAssets.delete(evictionCandidate);
-    transformDataByCharacter.delete(evictionCandidate);
-    transformStateByCharacter.delete(evictionCandidate);
-    transformRetainedObjects.delete(evictionCandidate);
-    appendLog(`Released retained transform references for character ${evictionCandidate}.`);
-  }
-}
-
 function applyTemporaryFields(request: OverrideRequest): void {
   if (request.temporaryFieldsApplied) {
     return;
@@ -297,6 +259,46 @@ function applyTemporaryFields(request: OverrideRequest): void {
   request.sourceAsset.field<Il2Cpp.Object>("skeletonData").value = request.transformData;
   request.sourceAsset.field<Il2Cpp.Object>("stateData").value = request.transformStateData;
   request.temporaryFieldsApplied = true;
+}
+
+function releasePreparedTransforms(reason: string): void {
+  removeExpiredOverrides();
+  for (const requests of activeOverrides.values()) {
+    for (const request of requests) {
+      try {
+        restoreTemporaryFields(request);
+      } catch (error) {
+        appendLog(`Failed to restore Cutin override during ${reason}: ${String(error)}`);
+      }
+    }
+  }
+  activeOverrides.clear();
+
+  if (pendingAssets.size > 0) {
+    appendLog(`Deferred transform cleanup during ${reason}; ${pendingAssets.size} load(s) still pending.`);
+    return;
+  }
+
+  const resources = Il2Cpp.domain
+    .assembly("UnityEngine.CoreModule")
+    .image.class("UnityEngine.Resources");
+  let released = 0;
+  for (const asset of transformAssets.values()) {
+    if (asset.isNull()) {
+      continue;
+    }
+    try {
+      resources.method("UnloadAsset", 1).invoke(asset);
+      released += 1;
+    } catch (error) {
+      appendLog(`Failed to release transform asset during ${reason}: ${String(error)}`);
+    }
+  }
+  transformAssets.clear();
+  transformDataByCharacter.clear();
+  transformStateByCharacter.clear();
+  retainedObjects.length = 0;
+  appendLog(`Released ${released} prepared transform asset(s) during ${reason}.`);
 }
 
 function completeOverride(asset: Il2Cpp.Object): void {
@@ -341,6 +343,7 @@ function beginTransformLoad(mapping: CharacterMapping): void {
     throw error;
   }
   pendingAssets.set(mapping.characterId, { mapping, request, generation: assetGeneration });
+  retainedObjects.push(request);
   appendLog(`Started transform asset load for character ${mapping.characterId}.`);
 }
 
@@ -371,7 +374,7 @@ function finalizeTransformLoad(mapping: CharacterMapping, generation: number): b
     throw new Error(`Unable to parse transform skeleton for ${mapping.characterId}`);
   }
 
-  const aliases = ensureAnimationAliases(transformData, mapping.characterId);
+  ensureAnimationAliases(transformData, mapping.characterId);
   const transformStateData = transformAsset.method("GetAnimationStateData").invoke() as Il2Cpp.Object;
   if (transformStateData.isNull()) {
     throw new Error(`Unable to prepare transform animation state for ${mapping.characterId}`);
@@ -379,14 +382,7 @@ function finalizeTransformLoad(mapping: CharacterMapping, generation: number): b
   transformAssets.set(mapping.characterId, transformAsset);
   transformDataByCharacter.set(mapping.characterId, transformData);
   transformStateByCharacter.set(mapping.characterId, transformStateData);
-  transformRetainedObjects.set(mapping.characterId, [
-    transformAsset,
-    transformData,
-    transformStateData,
-    ...aliases,
-  ]);
-  touchTransform(mapping.characterId);
-  trimTransformCache();
+  retainedObjects.push(transformAsset, transformData, transformStateData);
   pendingAssets.delete(mapping.characterId);
   releaseBundle(mapping.transformBundle, false);
   appendLog(`Released transform bundle container for character ${mapping.characterId}.`);
@@ -455,6 +451,33 @@ Il2Cpp.perform(() => {
     const spineUnity = Il2Cpp.domain.assembly("spine-unity").image;
     const skeletonDataAsset = spineUnity.class("Spine.Unity.SkeletonDataAsset");
     const skeletonGraphic = spineUnity.class("Spine.Unity.SkeletonGraphic");
+    const pictureBookView = Il2Cpp.domain
+      .assembly("Assembly-CSharp")
+      .image.class("PictureBookUnitProfileRootView");
+    const pictureBookTransformAnimation = pictureBookView
+      .method("CharaAnimPlay")
+      .overload("TKS.Network.Domain.PictureBookUnitEntity");
+    const pictureBookCharacterUnload = pictureBookView.method("CharaUnload", 0);
+
+    Interceptor.attach(pictureBookTransformAnimation.virtualAddress, {
+      onEnter(): void {
+        try {
+          releasePreparedTransforms("picture-book transform playback");
+        } catch (error) {
+          appendLog(`Failed to prepare native transform playback: ${String(error)}`);
+        }
+      },
+    });
+
+    Interceptor.attach(pictureBookCharacterUnload.virtualAddress, {
+      onLeave(_retval): void {
+        try {
+          releasePreparedTransforms("picture-book character unload");
+        } catch (error) {
+          appendLog(`Failed to clean up unloaded picture-book character: ${String(error)}`);
+        }
+      },
+    });
 
     Interceptor.attach(skeletonDataAsset.method("GetSkeletonData", 1).virtualAddress, {
       onEnter(args): void {
@@ -595,8 +618,6 @@ Il2Cpp.perform(() => {
             stateDataServed: false,
           });
           activeOverrides.set(assetHandle, requests);
-          touchTransform(characterId);
-          trimTransformCache();
           appendLog(
             `Registered temporary Cutin override for character ${characterId}; asset=${assetHandle} queue=${requests.length}.`,
           );
