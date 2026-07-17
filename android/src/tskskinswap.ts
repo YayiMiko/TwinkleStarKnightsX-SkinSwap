@@ -20,26 +20,43 @@ interface MappingDocument {
 
 interface PendingAsset {
   mapping: CharacterMapping;
-  request: Il2Cpp.Object;
   generation: number;
+}
+
+interface OverrideRequest {
+  characterId: string;
+  sourceAsset: Il2Cpp.Object;
+  transformData: Il2Cpp.Object;
+  transformStateData: Il2Cpp.Object;
+  expiresAt: number;
+  originalSkeletonData?: Il2Cpp.Object;
+  originalStateData?: Il2Cpp.Object;
+  temporaryFieldsApplied: boolean;
+  skeletonDataServed: boolean;
+  stateDataServed: boolean;
 }
 
 const fallbackRoot =
   "/sdcard/Android/data/jp.co.fanzagames.twinklestarknightsx_a_mod/files/tskskinswap";
 
 const mappings = new Map<string, CharacterMapping>();
-const loadedBundles = new Map<string, Il2Cpp.Object>();
 const transformAssets = new Map<string, Il2Cpp.Object>();
 const transformDataByCharacter = new Map<string, Il2Cpp.Object>();
+const transformStateByCharacter = new Map<string, Il2Cpp.Object>();
 const pendingAssets = new Map<string, PendingAsset>();
 const completionScheduled = new Set<string>();
-const cutinAssetClones = new Map<string, Il2Cpp.Object>();
+const activeOverrides = new Map<string, OverrideRequest[]>();
+const skeletonOverrideContexts = new WeakMap<object, OverrideRequest>();
+const stateOverrideContexts = new WeakMap<object, OverrideRequest>();
+const completionContexts = new WeakMap<object, Il2Cpp.Object>();
 const retainedObjects: Il2Cpp.Object[] = [];
 const excludedCharacterIds = new Set(["1141001"]);
 
 let root = fallbackRoot;
 let activeManagerHandle = "";
 let assetGeneration = 0;
+let skeletonAddressables: Il2Cpp.Class | null = null;
+let cancellationTokenNone: Il2Cpp.ValueType | null = null;
 
 function appendLog(message: string): void {
   const line = `${new Date().toISOString()} ${message}\n`;
@@ -107,24 +124,18 @@ function stringValue(value: unknown): string {
   return String(value ?? "");
 }
 
-function loadBundle(path: string): Il2Cpp.Object {
-  const existing = loadedBundles.get(path);
-  if (existing !== undefined && !existing.isNull()) {
-    return existing;
+function getSkeletonAddressables(): Il2Cpp.Class {
+  if (skeletonAddressables === null) {
+    throw new Error("Skeleton Addressables wrapper is not initialized");
   }
+  return skeletonAddressables;
+}
 
-  const assetBundleClass = Il2Cpp.domain
-    .assembly("UnityEngine.AssetBundleModule")
-    .image.class("UnityEngine.AssetBundle");
-  const bundle = assetBundleClass
-    .method("LoadFromFile", 1)
-    .invoke(Il2Cpp.string(path)) as Il2Cpp.Object;
-  if (bundle.isNull()) {
-    throw new Error(`Unable to load bundle: ${path}`);
+function getCancellationTokenNone(): Il2Cpp.ValueType {
+  if (cancellationTokenNone === null) {
+    throw new Error("Cancellation token is not initialized");
   }
-  loadedBundles.set(path, bundle);
-  retainedObjects.push(bundle);
-  return bundle;
+  return cancellationTokenNone;
 }
 
 function animationName(animation: Il2Cpp.Object): string {
@@ -167,24 +178,22 @@ function ensureAnimationAliases(skeletonData: Il2Cpp.Object, characterId: string
   }
 }
 
-function releaseBundle(path: string, unloadAll: boolean): void {
-  const bundle = loadedBundles.get(path);
-  if (bundle === undefined || bundle.isNull()) {
-    return;
-  }
+function releaseAddressable(path: string): void {
   try {
-    bundle.method("Unload", 1).invoke(unloadAll);
+    getSkeletonAddressables()
+      .method("ReleaseCache", 1)
+      .overload("System.String")
+      .invoke(Il2Cpp.string(path));
   } catch (error) {
-    appendLog(`Failed to unload bundle ${path}: ${String(error)}`);
+    appendLog(`Failed to release Addressable ${path}: ${String(error)}`);
   }
-  loadedBundles.delete(path);
 }
 
 function abandonPending(mapping: CharacterMapping, generation: number): void {
   const pending = pendingAssets.get(mapping.characterId);
   if (pending !== undefined && pending.generation === generation) {
     pendingAssets.delete(mapping.characterId);
-    releaseBundle(mapping.transformBundle, true);
+    releaseAddressable(mapping.transformSkeletonAsset);
   }
 }
 
@@ -192,44 +201,101 @@ function activateManager(handle: string): void {
   if (activeManagerHandle === handle) {
     return;
   }
-  assetGeneration += 1;
   activeManagerHandle = handle;
+  appendLog(`Activated Cutin manager ${handle}; generation=${assetGeneration}.`);
+}
 
-  const unityObject = Il2Cpp.domain
-    .assembly("UnityEngine.CoreModule")
-    .image.class("UnityEngine.Object");
-  for (const clone of cutinAssetClones.values()) {
-    if (!clone.isNull()) {
+function restoreTemporaryFields(request: OverrideRequest): void {
+  if (!request.temporaryFieldsApplied || request.sourceAsset.isNull()) {
+    return;
+  }
+  if (request.originalSkeletonData !== undefined) {
+    request.sourceAsset.field<Il2Cpp.Object>("skeletonData").value = request.originalSkeletonData;
+  }
+  if (request.originalStateData !== undefined) {
+    request.sourceAsset.field<Il2Cpp.Object>("stateData").value = request.originalStateData;
+  }
+  request.temporaryFieldsApplied = false;
+}
+
+function removeExpiredOverrides(): void {
+  const now = Date.now();
+  for (const [assetHandle, requests] of activeOverrides) {
+    while (requests.length > 0 && requests[0].expiresAt <= now) {
+      const expired = requests.shift()!;
       try {
-        unityObject.method("Destroy", 1).invoke(clone);
+        restoreTemporaryFields(expired);
       } catch (error) {
-        appendLog(`Failed to destroy stale Cutin clone: ${String(error)}`);
+        appendLog(`Failed to restore expired override for ${expired.characterId}: ${String(error)}`);
+      }
+      appendLog(`Expired Cutin override for character ${expired.characterId}.`);
+    }
+    if (requests.length === 0) {
+      activeOverrides.delete(assetHandle);
+    }
+  }
+}
+
+function getActiveOverride(asset: Il2Cpp.Object): OverrideRequest | undefined {
+  removeExpiredOverrides();
+  const requests = activeOverrides.get(asset.handle.toString());
+  return requests !== undefined && requests.length > 0 ? requests[0] : undefined;
+}
+
+function applyTemporaryFields(request: OverrideRequest): void {
+  if (request.temporaryFieldsApplied) {
+    return;
+  }
+  request.originalSkeletonData = request.sourceAsset.field<Il2Cpp.Object>("skeletonData").value;
+  request.originalStateData = request.sourceAsset.field<Il2Cpp.Object>("stateData").value;
+  request.sourceAsset.field<Il2Cpp.Object>("skeletonData").value = request.transformData;
+  request.sourceAsset.field<Il2Cpp.Object>("stateData").value = request.transformStateData;
+  request.temporaryFieldsApplied = true;
+}
+
+function releasePreparedTransforms(reason: string): void {
+  removeExpiredOverrides();
+  for (const requests of activeOverrides.values()) {
+    for (const request of requests) {
+      try {
+        restoreTemporaryFields(request);
+      } catch (error) {
+        appendLog(`Failed to restore Cutin override during ${reason}: ${String(error)}`);
       }
     }
   }
-  cutinAssetClones.clear();
+  activeOverrides.clear();
 
-  const resources = Il2Cpp.domain
-    .assembly("UnityEngine.CoreModule")
-    .image.class("UnityEngine.Resources");
-  for (const asset of transformAssets.values()) {
-    if (!asset.isNull()) {
-      try {
-        resources.method("UnloadAsset", 1).invoke(asset);
-      } catch (error) {
-        appendLog(`Failed to unload stale transform asset: ${String(error)}`);
-      }
+  let released = 0;
+  for (const characterId of transformAssets.keys()) {
+    const mapping = mappings.get(characterId);
+    if (mapping !== undefined) {
+      releaseAddressable(mapping.transformSkeletonAsset);
+      released += 1;
     }
   }
   transformAssets.clear();
   transformDataByCharacter.clear();
-  pendingAssets.clear();
-  completionScheduled.clear();
-  for (const path of Array.from(loadedBundles.keys())) {
-    releaseBundle(path, true);
-  }
+  transformStateByCharacter.clear();
   retainedObjects.length = 0;
-  appendLog(`Activated Cutin manager ${handle}; generation=${assetGeneration}.`);
+  appendLog(`Released ${released} prepared transform asset(s) during ${reason}.`);
+}
+
+function completeOverride(asset: Il2Cpp.Object): void {
+  removeExpiredOverrides();
+  const assetHandle = asset.handle.toString();
+  const requests = activeOverrides.get(assetHandle);
+  if (requests === undefined || requests.length === 0) {
+    return;
+  }
+  const request = requests.shift()!;
+  restoreTemporaryFields(request);
+  if (requests.length === 0) {
+    activeOverrides.delete(assetHandle);
+  }
+  appendLog(
+    `Completed Cutin override for character ${request.characterId}; skeleton=${request.skeletonDataServed} state=${request.stateDataServed}.`,
+  );
 }
 
 function beginTransformLoad(mapping: CharacterMapping): void {
@@ -240,25 +306,29 @@ function beginTransformLoad(mapping: CharacterMapping): void {
     return;
   }
 
-  const bundle = loadBundle(mapping.transformBundle);
-  const objectType = Il2Cpp.domain
-    .assembly("UnityEngine.CoreModule")
-    .image.class("UnityEngine.Object").type.object;
-  let request: Il2Cpp.Object;
-  try {
-    request = bundle
-      .method("LoadAssetAsync", 2)
-      .invoke(Il2Cpp.string(mapping.transformSkeletonAsset), objectType) as Il2Cpp.Object;
-    if (request.isNull()) {
-      throw new Error(`Unable to start transform asset load for ${mapping.characterId}`);
+  getSkeletonAddressables()
+    .method("Load", 2)
+    .invoke(Il2Cpp.string(mapping.transformSkeletonAsset), getCancellationTokenNone());
+  pendingAssets.set(mapping.characterId, { mapping, generation: assetGeneration });
+  appendLog(`Requested transform Addressable for character ${mapping.characterId}.`);
+}
+
+function findAddressableAsset(path: string): Il2Cpp.Object | null {
+  const cache = getSkeletonAddressables().method("GetCache", 0).invoke() as Il2Cpp.Object;
+  const count = cache.method("get_Count").invoke() as number;
+  for (let index = 0; index < count; index += 1) {
+    const entry = cache.method("get_Item", 1).invoke(index) as Il2Cpp.Object;
+    if (entry.isNull()) {
+      continue;
     }
-  } catch (error) {
-    releaseBundle(mapping.transformBundle, true);
-    throw error;
+    const entryPath = stringValue(entry.method("get_Path").invoke());
+    if (entryPath !== path) {
+      continue;
+    }
+    const asset = entry.method("get_Value").invoke() as Il2Cpp.Object;
+    return asset.isNull() ? null : asset;
   }
-  pendingAssets.set(mapping.characterId, { mapping, request, generation: assetGeneration });
-  retainedObjects.push(request);
-  appendLog(`Started transform asset load for character ${mapping.characterId}.`);
+  return null;
 }
 
 function finalizeTransformLoad(mapping: CharacterMapping, generation: number): boolean {
@@ -274,13 +344,9 @@ function finalizeTransformLoad(mapping: CharacterMapping, generation: number): b
   if (pending === undefined || pending.generation !== generation) {
     return false;
   }
-  const isDone = Boolean(pending.request.method("get_isDone").invoke());
-  if (!isDone) {
+  const transformAsset = findAddressableAsset(mapping.transformSkeletonAsset);
+  if (transformAsset === null) {
     return false;
-  }
-  const transformAsset = pending.request.method("get_asset").invoke() as Il2Cpp.Object;
-  if (transformAsset.isNull()) {
-    throw new Error(`Transform SkeletonDataAsset not found: ${mapping.transformSkeletonAsset}`);
   }
 
   const transformData = transformAsset.method("GetSkeletonData", 1).invoke(false) as Il2Cpp.Object;
@@ -289,13 +355,16 @@ function finalizeTransformLoad(mapping: CharacterMapping, generation: number): b
   }
 
   ensureAnimationAliases(transformData, mapping.characterId);
+  const transformStateData = transformAsset.method("GetAnimationStateData").invoke() as Il2Cpp.Object;
+  if (transformStateData.isNull()) {
+    throw new Error(`Unable to prepare transform animation state for ${mapping.characterId}`);
+  }
   transformAssets.set(mapping.characterId, transformAsset);
   transformDataByCharacter.set(mapping.characterId, transformData);
-  retainedObjects.push(transformAsset, transformData);
+  transformStateByCharacter.set(mapping.characterId, transformStateData);
+  retainedObjects.push(transformAsset, transformData, transformStateData);
   pendingAssets.delete(mapping.characterId);
-  releaseBundle(mapping.transformBundle, false);
-  appendLog(`Released transform bundle container for character ${mapping.characterId}.`);
-  appendLog(`Transform asset ready for character ${mapping.characterId}.`);
+  appendLog(`Transform Addressable ready for character ${mapping.characterId}.`);
   return true;
 }
 
@@ -357,6 +426,117 @@ Il2Cpp.perform(() => {
       .image.class("EffectCutinManager")
       .method("SetNormalCutin", 5);
     const loadCutin = setNormalCutin.class.method("LoadCutin", 1);
+    const spineUnity = Il2Cpp.domain.assembly("spine-unity").image;
+    const skeletonDataAsset = spineUnity.class("Spine.Unity.SkeletonDataAsset");
+    const skeletonGraphic = spineUnity.class("Spine.Unity.SkeletonGraphic");
+    skeletonAddressables = Il2Cpp.domain
+      .assembly("Assembly-CSharp")
+      .image.class("AddressableWrapper`1")
+      .inflate(skeletonDataAsset);
+    cancellationTokenNone = Il2Cpp.corlib
+      .class("System.Threading.CancellationToken")
+      .alloc()
+      .unbox();
+    const pictureBookView = Il2Cpp.domain
+      .assembly("Assembly-CSharp")
+      .image.class("PictureBookUnitProfileRootView");
+    const pictureBookTransformAnimation = pictureBookView
+      .method("CharaAnimPlay")
+      .overload("TKS.Network.Domain.PictureBookUnitEntity");
+    const pictureBookCharacterUnload = pictureBookView.method("CharaUnload", 0);
+
+    Interceptor.attach(pictureBookTransformAnimation.virtualAddress, {
+      onEnter(): void {
+        try {
+          releasePreparedTransforms("picture-book transform playback");
+        } catch (error) {
+          appendLog(`Failed to prepare native transform playback: ${String(error)}`);
+        }
+      },
+    });
+
+    Interceptor.attach(pictureBookCharacterUnload.virtualAddress, {
+      onLeave(_retval): void {
+        try {
+          releasePreparedTransforms("picture-book character unload");
+        } catch (error) {
+          appendLog(`Failed to clean up unloaded picture-book character: ${String(error)}`);
+        }
+      },
+    });
+
+    Interceptor.attach(skeletonDataAsset.method("GetSkeletonData", 1).virtualAddress, {
+      onEnter(args): void {
+        try {
+          const asset = new Il2Cpp.Object(args[0]);
+          const request = getActiveOverride(asset);
+          if (request === undefined) {
+            return;
+          }
+          applyTemporaryFields(request);
+          request.skeletonDataServed = true;
+          skeletonOverrideContexts.set(this, request);
+        } catch (error) {
+          appendLog(`Failed to serve temporary Cutin skeleton: ${String(error)}`);
+        }
+      },
+      onLeave(retval): void {
+        const request = skeletonOverrideContexts.get(this);
+        if (request !== undefined) {
+          retval.replace(request.transformData.handle);
+          skeletonOverrideContexts.delete(this);
+        }
+      },
+    });
+
+    Interceptor.attach(skeletonDataAsset.method("GetAnimationStateData").virtualAddress, {
+      onEnter(args): void {
+        try {
+          const asset = new Il2Cpp.Object(args[0]);
+          const request = getActiveOverride(asset);
+          if (request === undefined) {
+            return;
+          }
+          applyTemporaryFields(request);
+          request.stateDataServed = true;
+          stateOverrideContexts.set(this, request);
+        } catch (error) {
+          appendLog(`Failed to serve temporary Cutin animation state: ${String(error)}`);
+        }
+      },
+      onLeave(retval): void {
+        const request = stateOverrideContexts.get(this);
+        if (request !== undefined) {
+          retval.replace(request.transformStateData.handle);
+          stateOverrideContexts.delete(this);
+        }
+      },
+    });
+
+    Interceptor.attach(skeletonGraphic.method("Initialize", 1).virtualAddress, {
+      onEnter(args): void {
+        try {
+          const graphic = new Il2Cpp.Object(args[0]);
+          const asset = graphic.field<Il2Cpp.Object>("skeletonDataAsset").value;
+          if (!asset.isNull() && getActiveOverride(asset) !== undefined) {
+            completionContexts.set(this, asset);
+          }
+        } catch (error) {
+          appendLog(`Failed to observe Cutin completion: ${String(error)}`);
+        }
+      },
+      onLeave(_retval): void {
+        const sourceAsset = completionContexts.get(this);
+        if (sourceAsset !== undefined) {
+          try {
+            completeOverride(sourceAsset);
+          } catch (error) {
+            appendLog(`Failed to complete Cutin override: ${String(error)}`);
+          }
+          completionContexts.delete(this);
+        }
+      },
+    });
 
     Interceptor.attach(loadCutin.virtualAddress, {
       onEnter(args): void {
@@ -390,59 +570,50 @@ Il2Cpp.perform(() => {
           const cutinData = manager.field<Il2Cpp.Object>("cutinData").value;
           const transformAsset = transformAssets.get(characterId);
           const transformData = transformDataByCharacter.get(characterId);
+          const transformStateData = transformStateByCharacter.get(characterId);
           if (
             transformAsset === undefined ||
             transformAsset.isNull() ||
             transformData === undefined ||
-            transformData.isNull()
+            transformData.isNull() ||
+            transformStateData === undefined ||
+            transformStateData.isNull()
           ) {
             appendLog(`Transform asset not ready for character ${characterId}; using original Cutin.`);
             return;
           }
 
           const dictionaryKey = Il2Cpp.string(characterId);
-          const cloneKey = `${manager.handle}:${characterId}`;
-          let cutinClone = cutinAssetClones.get(cloneKey);
-          if (cutinClone === undefined || cutinClone.isNull()) {
-            const originalCutin = cutinData
-              .method("get_Item", 1)
-              .invoke(dictionaryKey) as Il2Cpp.Object;
-            if (originalCutin.isNull()) {
-              throw new Error(`Original Cutin asset not found for ${characterId}`);
-            }
-            const originalData = originalCutin
-              .method("GetSkeletonData", 1)
-              .invoke(false) as Il2Cpp.Object;
-            if (originalData.isNull()) {
-              throw new Error(`Original Cutin SkeletonData not found for ${characterId}`);
-            }
-            const unityObject = Il2Cpp.domain
-              .assembly("UnityEngine.CoreModule")
-              .image.class("UnityEngine.Object");
-            cutinClone = unityObject
-              .method("Instantiate", 1)
-              .invoke(originalCutin) as Il2Cpp.Object;
-            if (cutinClone.isNull()) {
-              throw new Error(`Unable to clone original Cutin asset for ${characterId}`);
-            }
-            cutinClone.method("InitializeWithData", 1).invoke(transformData);
-            cutinAssetClones.set(cloneKey, cutinClone);
-            retainedObjects.push(cutinClone);
-            appendLog(
-              `Prepared Cutin clone for ${characterId}; originalScale=${originalCutin.field<number>("scale").value} transformScale=${transformAsset.field<number>("scale").value} originalSize=${originalData.method("get_Width").invoke()}x${originalData.method("get_Height").invoke()} transformSize=${transformData.method("get_Width").invoke()}x${transformData.method("get_Height").invoke()}.`,
-            );
+          const sourceAsset = cutinData
+            .method("get_Item", 1)
+            .invoke(dictionaryKey) as Il2Cpp.Object;
+          if (sourceAsset.isNull()) {
+            throw new Error(`Original Cutin asset not found for ${characterId}`);
           }
-          cutinData
-            .method("set_Item", 2)
-            .invoke(dictionaryKey, cutinClone);
-          appendLog(`Replaced battle Cutin entry for character ${characterId}.`);
+          removeExpiredOverrides();
+          const assetHandle = sourceAsset.handle.toString();
+          const requests = activeOverrides.get(assetHandle) ?? [];
+          requests.push({
+            characterId,
+            sourceAsset,
+            transformData,
+            transformStateData,
+            expiresAt: Date.now() + 30_000,
+            temporaryFieldsApplied: false,
+            skeletonDataServed: false,
+            stateDataServed: false,
+          });
+          activeOverrides.set(assetHandle, requests);
+          appendLog(
+            `Registered temporary Cutin override for character ${characterId}; asset=${assetHandle} queue=${requests.length}.`,
+          );
         } catch (error) {
-          appendLog(`Failed to replace battle Cutin for ${characterId}: ${String(error)}`);
+          appendLog(`Failed to register battle Cutin override for ${characterId}: ${String(error)}`);
         }
       },
     });
 
-    appendLog("Battle-only Cutin interceptors installed.");
+    appendLog("Temporary battle Cutin interceptors installed.");
   } catch (error) {
     appendLog(`Initialization failed: ${String(error)}`);
   }
