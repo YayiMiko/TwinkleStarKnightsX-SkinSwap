@@ -166,18 +166,28 @@ function Get-TskAndroidPython {
     return $pythonExe
 }
 
+function Set-TskAndroidWorkingDirectory {
+    $workingDirectory = Join-Path ([IO.Path]::GetTempPath()) 'TskSkinSwap\working'
+    New-Item -ItemType Directory -Force -Path $workingDirectory | Out-Null
+    Set-Location -LiteralPath $workingDirectory
+    return $workingDirectory
+}
+
 function Start-TskAdbServer {
     param([Parameter(Mandatory = $true)][string]$AdbExe)
 
     # Windows PowerShell 5 promotes native stderr to an error record. ADB writes
     # its normal first-start daemon messages there, so check the exit code instead.
     $previousPreference = $ErrorActionPreference
+    $previousLocation = (Get-Location).Path
     try {
+        [void](Set-TskAndroidWorkingDirectory)
         $ErrorActionPreference = 'SilentlyContinue'
         & $AdbExe start-server 2>$null | Out-Null
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousPreference
+        Set-Location -LiteralPath $previousLocation
     }
     if ($exitCode -ne 0) {
         throw "ADB server failed to start with exit code $exitCode."

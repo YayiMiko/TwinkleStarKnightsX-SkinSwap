@@ -36,12 +36,25 @@ try {
     $fakeAdb = Join-Path $testRoot 'adb.cmd'
     @(
         '@echo off',
+        'if "%1"=="start-server" (',
+        '  cd>"%~dp0adb-working-directory.txt"',
+        '  exit /b 0',
+        ')',
         'echo * daemon not running; starting now at tcp:5037 1>&2',
         'echo List of devices attached',
         'echo TEST-PHONE unauthorized',
         'echo.',
         'exit /b 0'
     ) | Set-Content -LiteralPath $fakeAdb -Encoding ASCII
+
+    Start-TskAdbServer -AdbExe $fakeAdb
+    $adbWorkingDirectory = Get-Content -Raw -LiteralPath (Join-Path $testRoot 'adb-working-directory.txt')
+    $releaseRoot = [IO.Path]::GetFullPath($repositoryRoot).TrimEnd('\') + '\'
+    if ([IO.Path]::GetFullPath($adbWorkingDirectory.Trim()).StartsWith(
+        $releaseRoot,
+        [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'ADB was started with the release folder as its working directory.'
+    }
 
     $devices = @(Get-TskAdbDevices -AdbExe $fakeAdb)
     if ($devices.Count -ne 1 -or
@@ -83,8 +96,9 @@ try {
     )) {
         $content = Get-Content -Raw -Encoding UTF8 (Join-Path $repositoryRoot $entryScript)
         if ($content -match 'get-state' -or
-            $content -notmatch 'Wait-TskAuthorizedAndroidDevice') {
-            throw "$entryScript does not use the shared authorization check."
+            $content -notmatch 'Wait-TskAuthorizedAndroidDevice' -or
+            $content -notmatch 'Set-TskAndroidWorkingDirectory') {
+            throw "$entryScript does not use the shared Android setup helpers."
         }
     }
     $builder = Get-Content -Raw -Encoding UTF8 (Join-Path $repositoryRoot 'Build-TskSkinSwap-AndroidApk.ps1')

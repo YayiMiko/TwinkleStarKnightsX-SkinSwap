@@ -22,6 +22,12 @@ $patchedApk = Join-Path $toolRoot '.tools\android-output\TskSkinSwap-Android-cur
 $releaseRuntime = Join-Path $toolRoot 'android\runtime\tskskinswap.js'
 $developmentRuntime = Join-Path $toolRoot 'android\dist\tskskinswap.js'
 $runtime = if (Test-Path $releaseRuntime) { $releaseRuntime } else { $developmentRuntime }
+$resolvedSourceApkArgument = if ($SourceApk) {
+    (Resolve-Path -LiteralPath $SourceApk).Path
+} else {
+    $null
+}
+[void](Set-TskAndroidWorkingDirectory)
 $adbExe = Get-TskAndroidAdb -ToolRoot $toolRoot
 $pythonExe = Get-TskAndroidPython -ToolRoot $toolRoot
 Start-TskAdbServer -AdbExe $adbExe
@@ -86,7 +92,7 @@ function Start-TskAndroidGame {
 
 if (-not $DryRun) {
     if ($SourceApk) {
-        $resolvedSourceApk = (Resolve-Path $SourceApk).Path
+        $resolvedSourceApk = $resolvedSourceApkArgument
         $targetPackageVersion = $installedPackageVersion
     } else {
         $source = Get-TskCompatibleSourceApk `

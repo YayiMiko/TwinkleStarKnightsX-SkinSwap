@@ -18,6 +18,7 @@ if (-not (Test-Path $commonTools)) {
 if ($Package -notmatch '^[A-Za-z0-9._]+$') {
     throw 'Invalid Android package name.'
 }
+[void](Set-TskAndroidWorkingDirectory)
 $adbExe = Get-TskAndroidAdb -ToolRoot $toolRoot
 Start-TskAdbServer -AdbExe $adbExe
 
