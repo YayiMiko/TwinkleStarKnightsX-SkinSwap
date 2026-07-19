@@ -6,6 +6,7 @@
 - 修复手机处于 `unauthorized` 状态时，PowerShell 将 ADB 提示误报为脚本异常并立即退出的问题。
 - 兼容 `adb devices` 输出中的空行，避免设备检查被 PowerShell 参数验证提前中断。
 - 等待连接或 USB 调试授权时显示醒目的中文操作框，明确说明现在需要操作手机，完成后安装会自动继续。
+- 未检测到手机时先引导用户在设置中开启 USB 调试，再重新连接并确认授权，不再假设手机一定会主动弹窗。
 - Android 构建过程会自动改用可写的纯英文临时目录，修复 Windows 用户名含中文时 `Illegal byte sequence` 导致安装失败的问题。
 
 ## Android Release 0.3.0 - 2026-07-17
