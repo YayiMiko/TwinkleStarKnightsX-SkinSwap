@@ -19,11 +19,11 @@ The release includes the compiled plugin and does not require a .NET SDK. The fi
 
 To upgrade from an older PC release, you do not need to uninstall it. Close the game, replace the old `TskSkinSwap` folder with the fully extracted 1.2.2 folder, and run the new `Apply-TskSkinSwap.bat`. Existing valid downloads will be reused.
 
-## Android Release 0.3.0
+## Android Release 0.3.1
 
-The Android installer discovers the latest compatible package automatically while preserving the translation and existing game data. Android 0.3.0 fixes disappearing attack animations and white screens after repeated gallery playback. See [the Android instructions](README.android.md) before using [Android Release 0.3.0](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.3.0).
+The Android installer discovers the latest compatible package automatically while preserving the translation and existing game data. Android 0.3.1 adds clear Chinese prompts whenever the phone needs attention, supports Windows paths containing Chinese characters, and prevents ADB from keeping the extracted folder in use. It also includes the animation stability fixes from 0.3.0. See [the Android instructions](README.android.md) before using [Android Release 0.3.1](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.3.1).
 
-Android 0.3.0 still requires a Windows PC, a USB cable, and USB debugging. A phone-only installer that can install and update the mod without a PC is under development.
+Android 0.3.1 still requires a Windows PC, a USB cable, and USB debugging. A phone-only installer that can install and update the mod without a PC is under development.
 
 ## Uninstall
 

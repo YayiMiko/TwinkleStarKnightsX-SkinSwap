@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Android 0.3.0 is the current formal Android release. It dynamically discovers the latest compatible APK. A phone-only installer is under development; the current flow still requires a Windows PC and USB debugging.
+Android 0.3.1 is the current formal Android release. It dynamically discovers the latest compatible APK. A phone-only installer is under development; the current flow still requires a Windows PC and USB debugging.
 
 ## Installation Architecture
 

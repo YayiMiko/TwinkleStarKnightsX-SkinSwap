@@ -1,6 +1,6 @@
 # 更新记录
 
-## 未发布
+## Android Release 0.3.1 - 2026-07-19
 
 - Android 安装和卸载现在会等待手机完成 USB 调试授权，并明确提示需要在手机上点击“允许”。
 - 修复手机处于 `unauthorized` 状态时，PowerShell 将 ADB 提示误报为脚本异常并立即退出的问题。

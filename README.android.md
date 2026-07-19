@@ -1,8 +1,8 @@
 # 闪耀星骑士 Android 动画替换 MOD
 
-## Android Release 0.3.0
+## Android Release 0.3.1
 
-Android 0.3.0 修复了连续查看角色后攻击动画消失或原生变身动画白屏的问题。请下载 [Android Release 0.3.0](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.3.0)，不要继续使用先前的 Android 安装器。
+Android 0.3.1 改进了首次安装和游戏更新后的操作流程：需要操作手机时会显示醒目的中文提示，并等待用户开启 USB 调试、解锁手机和确认最终安装。新版还修复了中文 Windows 路径导致安装失败，以及安装结束后解压文件夹可能被 ADB 占用的问题。它同时包含 0.3.0 的动画稳定性修复。请下载 [Android Release 0.3.1](https://github.com/YayiMiko/TSKSkinSwap/releases/tag/android-v0.3.1)，不要继续使用先前的 Android 安装器。
 
 新方案会由电脑自动完成以下操作：
 
