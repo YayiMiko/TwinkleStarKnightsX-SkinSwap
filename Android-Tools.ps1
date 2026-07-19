@@ -148,6 +148,141 @@ function Start-TskAdbServer {
     }
 }
 
+function ConvertFrom-TskAdbDevicesOutput {
+    param([Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Output)
+
+    foreach ($line in $Output) {
+        if ($line -match '^(?<Serial>\S+)\s+(?<State>device|unauthorized|offline|recovery|sideload|bootloader|host)(?:\s|$)') {
+            [pscustomobject]@{
+                Serial = $Matches.Serial
+                State = $Matches.State
+            }
+        } elseif ($line -match '^(?<Serial>\S+)\s+no permissions(?:\s|$)') {
+            [pscustomobject]@{
+                Serial = $Matches.Serial
+                State = 'no permissions'
+            }
+        }
+    }
+}
+
+function Get-TskAdbDevices {
+    param([Parameter(Mandatory = $true)][string]$AdbExe)
+
+    # ADB may write normal daemon startup messages to stderr. Windows
+    # PowerShell must not promote those messages to terminating errors.
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        $output = @(& $AdbExe devices 2>$null)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($exitCode -ne 0) {
+        throw "ADB could not list connected devices (exit code $exitCode)."
+    }
+    return @(ConvertFrom-TskAdbDevicesOutput -Output $output)
+}
+
+function Wait-TskAuthorizedAndroidDevice {
+    param(
+        [Parameter(Mandatory = $true)][string]$AdbExe,
+        [ValidateRange(0, 600)][int]$TimeoutSeconds = 90,
+        [ValidateRange(100, 10000)][int]$PollMilliseconds = 1000
+    )
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $lastState = $null
+    do {
+        $devices = @(Get-TskAdbDevices -AdbExe $AdbExe)
+        if ($devices.Count -gt 1) {
+            throw 'More than one Android device is connected. Disconnect the extra device and run this BAT again.'
+        }
+        if ($devices.Count -eq 1 -and $devices[0].State -eq 'device') {
+            if ($lastState) {
+                Write-Host 'USB debugging authorization confirmed.'
+            }
+            return $devices[0].Serial
+        }
+
+        $state = if ($devices.Count -eq 0) { 'missing' } else { $devices[0].State }
+        if ($state -ne $lastState) {
+            switch ($state) {
+                'unauthorized' {
+                    Write-Host 'Phone detected, waiting for USB debugging approval...'
+                    Write-Host 'Unlock the phone. In the "Allow USB debugging?" prompt, tap Allow.'
+                    Write-Host 'You may also select "Always allow from this computer".'
+                }
+                'offline' {
+                    Write-Host 'The phone is offline. Unlock it, reconnect the USB cable, and keep this window open.'
+                }
+                'no permissions' {
+                    Write-Host 'Windows cannot access the phone. Reconnect it and check the phone USB settings.'
+                }
+                'missing' {
+                    Write-Host 'Waiting for an Android phone. Connect it with a data-capable USB cable and unlock it.'
+                }
+                default {
+                    Write-Host "The phone is in ADB state '$state'. Start Android normally and reconnect it."
+                }
+            }
+            $lastState = $state
+        }
+
+        if ([DateTime]::UtcNow -ge $deadline) { break }
+        Start-Sleep -Milliseconds $PollMilliseconds
+    } while ($true)
+
+    switch ($lastState) {
+        'unauthorized' {
+            throw 'The phone is connected but USB debugging was not authorized. Unlock the phone, accept the USB debugging prompt, and run this BAT again. If no prompt appears, turn USB debugging off and on, then reconnect the cable.'
+        }
+        'offline' {
+            throw 'The phone stayed offline. Reconnect the USB cable, unlock the phone, and run this BAT again.'
+        }
+        'no permissions' {
+            throw 'Windows could not access the phone. Reconnect it, select a USB data mode, and run this BAT again.'
+        }
+        default {
+            throw 'No Android phone was detected. Use a data-capable USB cable, unlock the phone, enable USB debugging, and run this BAT again.'
+        }
+    }
+}
+
+function New-TskAsciiTemporaryDirectory {
+    param(
+        [ValidatePattern('^[A-Za-z0-9._-]+$')][string]$Prefix = 'TskSkinSwap',
+        [string[]]$CandidateRoot
+    )
+
+    if (-not $CandidateRoot) {
+        $CandidateRoot = @(
+            [IO.Path]::GetTempPath(),
+            (Join-Path ([Environment]::GetFolderPath(
+                [Environment+SpecialFolder]::CommonApplicationData)) 'TskSkinSwap\temp'),
+            (Join-Path ([Environment]::GetFolderPath(
+                [Environment+SpecialFolder]::CommonDocuments)) 'TskSkinSwap\temp')
+        )
+    }
+
+    foreach ($root in $CandidateRoot) {
+        if (-not $root) { continue }
+        $resolvedRoot = [IO.Path]::GetFullPath($root)
+        if ($resolvedRoot -match '[^\x00-\x7F]') { continue }
+
+        $directory = Join-Path $resolvedRoot "$Prefix-$([Guid]::NewGuid().ToString('N'))"
+        try {
+            New-Item -ItemType Directory -Path $directory -Force -ErrorAction Stop | Out-Null
+            return $directory
+        } catch {
+            continue
+        }
+    }
+
+    throw 'Unable to create the ASCII-only temporary directory required by the Android build tools.'
+}
+
 function Get-TskCompatibleSourceApk {
     param(
         [Parameter(Mandatory = $true)][string]$ToolRoot,

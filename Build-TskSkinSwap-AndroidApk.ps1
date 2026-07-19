@@ -13,6 +13,11 @@ param(
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $toolRoot = $PSScriptRoot
+$commonTools = Join-Path $toolRoot 'Android-Tools.ps1'
+if (-not (Test-Path $commonTools)) {
+    throw 'Android-Tools.ps1 is missing. Extract the entire release ZIP and retry.'
+}
+. $commonTools
 $androidRoot = Join-Path $toolRoot 'android'
 $developmentToolsRoot = Join-Path $toolRoot '.tools\android'
 $portableToolsRoot = Join-Path $toolRoot '.tools\android-apk'
@@ -192,13 +197,12 @@ $resolvedRuntime = (Resolve-Path $RuntimeScript).Path
 
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $resolvedOutputRoot = [IO.Path]::GetFullPath($outputRoot).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-$staging = Join-Path ([IO.Path]::GetTempPath()) ("TskSkinSwap-AndroidApk-" + [Guid]::NewGuid().ToString('N'))
+$staging = New-TskAsciiTemporaryDirectory -Prefix 'TskSkinSwap-AndroidApk'
 $stagedInput = Join-Path $staging 'input.apk'
 $stagedKey = Join-Path $staging 'objection.jks'
 $unsigned = Join-Path $staging 'unsigned.apk'
 $aligned = Join-Path $staging 'aligned.apk'
 $signed = Join-Path $staging 'signed.apk'
-New-Item -ItemType Directory -Force -Path $staging | Out-Null
 try {
     Copy-Item -LiteralPath $resolvedInput -Destination $stagedInput
     Copy-Item -LiteralPath $objectionKey -Destination $stagedKey

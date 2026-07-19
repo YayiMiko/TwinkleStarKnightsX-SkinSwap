@@ -52,3 +52,6 @@ jobs:
       - name: Test uninstall ownership
         shell: powershell
         run: .\tests\Test-UninstallOwnership.ps1
+      - name: Test Android device authorization
+        shell: powershell
+        run: .\tests\Test-AndroidDeviceAuthorization.ps1

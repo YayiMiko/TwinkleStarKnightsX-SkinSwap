@@ -21,13 +21,7 @@ if ($Package -notmatch '^[A-Za-z0-9._]+$') {
 $adbExe = Get-TskAndroidAdb -ToolRoot $toolRoot
 Start-TskAdbServer -AdbExe $adbExe
 
-if ((& $adbExe get-state 2>$null) -ne 'device') {
-    throw 'No authorized Android device is connected. Unlock the phone and allow USB debugging.'
-}
-$devices = @(& $adbExe devices | Select-String -Pattern "\tdevice$")
-if ($devices.Count -ne 1) {
-    throw "Exactly one authorized Android device is required; found $($devices.Count)."
-}
+[void](Wait-TskAuthorizedAndroidDevice -AdbExe $adbExe)
 if (-not ((& $adbExe shell pm path $Package 2>$null) -like 'package:*')) {
     throw "Android package is not installed: $Package"
 }

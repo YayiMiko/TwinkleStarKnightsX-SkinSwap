@@ -42,13 +42,7 @@ if (-not (Test-Path $runtime)) {
     }
 }
 
-if ((& $adbExe get-state 2>$null) -ne 'device') {
-    throw 'No authorized Android device is connected. Unlock the phone and allow USB debugging.'
-}
-$devices = @(& $adbExe devices | Select-String -Pattern "\tdevice$")
-if ($devices.Count -ne 1) {
-    throw "Exactly one authorized Android device is required; found $($devices.Count)."
-}
+[void](Wait-TskAuthorizedAndroidDevice -AdbExe $adbExe)
 $package = 'jp.co.fanzagames.twinklestarknightsx_a_mod'
 if (-not ((& $adbExe shell pm path $package 2>$null) -like 'package:*')) {
     throw 'Install and launch the compatible Android package (APK) once before applying this MOD.'
@@ -110,6 +104,7 @@ if (-not $DryRun) {
         -SkipRuntimeBuild `
         -Adb $adbExe
     if ($LASTEXITCODE -ne 0) { throw 'Compatible APK patching or installation failed.' }
+    [void](Wait-TskAuthorizedAndroidDevice -AdbExe $adbExe)
     & $adbExe shell am force-stop $package | Out-Null
 
     if ([version]$targetPackageVersion -gt [version]$installedPackageVersion) {
