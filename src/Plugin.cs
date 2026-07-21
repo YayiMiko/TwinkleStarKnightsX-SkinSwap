@@ -15,7 +15,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "com.codex.tskskinswap";
     public const string PluginName = "TSK Skin Swap";
-    public const string PluginVersion = "1.2.2";
+    public const string PluginVersion = "1.3.0";
 
     internal static ManualLogSource PluginLog { get; private set; } = null!;
 
@@ -58,9 +58,13 @@ public sealed class Plugin : BasePlugin
 internal static class NormalCutinRequestPatch
 {
     [HarmonyPrefix]
-    private static void Prefix(EffectCutinManager __instance, int id)
+    private static void Prefix(EffectCutinManager __instance, int id, bool __2)
     {
-        SkinSwapRuntime.RegisterNormalCutin(__instance, id);
+        // SetNormalCutin's third argument selects cut_2 (Normal Attack 2).
+        if (__2)
+        {
+            SkinSwapRuntime.RegisterNormalCutin(__instance, id);
+        }
     }
 }
 
@@ -469,7 +473,7 @@ internal static class SkinSwapRuntime
             throw new InvalidOperationException($"No cut animation exists in tf_m0 for character {characterId}.");
         }
 
-        foreach (var aliasName in new[] { "cut_1", "cut_2", "cut_3" })
+        foreach (var aliasName in new[] { "cut_2" })
         {
             if (skeletonData.FindAnimation(aliasName) is not null)
             {

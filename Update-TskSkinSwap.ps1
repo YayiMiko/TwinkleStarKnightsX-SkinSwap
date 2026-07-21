@@ -251,7 +251,10 @@ function Resolve-PluginPath {
 
     Write-Host 'Precompiled plugin not found in the source checkout; building the development plugin...'
     Initialize-LocalDotnet
-    & (Join-Path $toolRoot 'Build-TskSkinSwap.ps1') -GamePath $GamePath -SkipInstall
+    & (Join-Path $toolRoot 'Build-TskSkinSwap.ps1') -GamePath $GamePath -SkipInstall | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Plugin build failed with exit code $LASTEXITCODE"
+    }
     $developmentPlugin = Join-Path $toolRoot 'src\bin\Release\net6.0\TskSkinSwap.dll'
     Test-PluginAssembly -Path $developmentPlugin
     return (Resolve-Path -LiteralPath $developmentPlugin).Path

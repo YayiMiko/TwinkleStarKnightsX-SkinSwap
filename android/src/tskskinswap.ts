@@ -160,7 +160,7 @@ function ensureAnimationAliases(skeletonData: Il2Cpp.Object, characterId: string
   }
 
   const animationClass = Il2Cpp.domain.assembly("spine-unity").image.class("Spine.Animation");
-  for (const aliasName of ["cut_1", "cut_2", "cut_3"]) {
+  for (const aliasName of ["cut_2"]) {
     const found = skeletonData
       .method("FindAnimation", 1)
       .invoke(Il2Cpp.string(aliasName)) as Il2Cpp.Object;
@@ -560,7 +560,9 @@ Il2Cpp.perform(() => {
       onEnter(args): void {
         const characterId = args[1].toInt32().toString();
         const mapping = mappings.get(characterId);
-        if (mapping === undefined) {
+        // Frida includes `this` at args[0]; args[3] is the `ex` flag selecting cut_2.
+        const isNormalAttack2 = args[3].toInt32() !== 0;
+        if (mapping === undefined || !isNormalAttack2) {
           return;
         }
 

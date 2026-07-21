@@ -2,7 +2,7 @@
 
 ## Current Status
 
-Android 0.3.1 is the current formal Android release. It dynamically discovers the latest compatible APK. A phone-only installer is under development; the current flow still requires a Windows PC and USB debugging.
+Android 0.4.0 is the current formal Android release. It dynamically discovers the latest compatible APK. A phone-only installer is under development; the current flow still requires a Windows PC and USB debugging.
 
 ## Installation Architecture
 
@@ -31,4 +31,4 @@ cd ..
 
 The runtime reads `<persistentDataPath>/tskskinswap/mappings.json`. It observes `EffectCutinManager.LoadCutin`, requests transformation skeletons through the game's `AddressableWrapper<SkeletonDataAsset>`, and registers a temporary override during `SetNormalCutin`. `GetSkeletonData` and `GetAnimationStateData` serve the prepared data only for that request; `SkeletonGraphic.Initialize` then restores the original fields. The manager's `cutinData` dictionary is never replaced.
 
-Both Normal Attack 1 and Normal Attack 2 use the replacement. Lulu (`1141001`) remains excluded. Uninstall restores the cached, unmodified compatible APK with `adb install -r` and keeps downloaded transformation bundles by default.
+Only Normal Attack 2 uses the replacement; Normal Attack 1 keeps the game's original presentation. Lulu (`1141001`) remains excluded. Uninstall restores the cached, unmodified compatible APK with `adb install -r` and keeps downloaded transformation bundles by default.
