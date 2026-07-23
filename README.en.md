@@ -4,7 +4,7 @@ This mod replaces the character cutin shown during Normal Attack 2 with the supp
 
 PC 1.3.0 and Android 0.4.0 replace only Normal Attack 2. Normal Attack 1 remains unchanged. After a first installation or game update, open the gallery and play the character's relevant normal-attack animation once if the replacement has not loaded yet, then retry.
 
-Lulu (`[炎宿せし宝石] ルルゥ`, internal ID `1141001`) is currently excluded on both platforms. Her original normal-attack presentation remains active.
+Lulu (`[炎宿せし宝石] ルルゥ`) is currently excluded on both platforms. Her original normal-attack presentation remains active.
 
 [简体中文](README.md)
 

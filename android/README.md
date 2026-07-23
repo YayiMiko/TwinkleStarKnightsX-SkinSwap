@@ -31,4 +31,4 @@ cd ..
 
 The runtime reads `<persistentDataPath>/tskskinswap/mappings.json`. It observes `EffectCutinManager.LoadCutin`, requests transformation skeletons through the game's `AddressableWrapper<SkeletonDataAsset>`, and registers a temporary override during `SetNormalCutin`. `GetSkeletonData` and `GetAnimationStateData` serve the prepared data only for that request; `SkeletonGraphic.Initialize` then restores the original fields. The manager's `cutinData` dictionary is never replaced.
 
-Only Normal Attack 2 uses the replacement; Normal Attack 1 keeps the game's original presentation. Lulu (`1141001`) remains excluded. Uninstall restores the cached, unmodified compatible APK with `adb install -r` and keeps downloaded transformation bundles by default.
+Only Normal Attack 2 uses the replacement; Normal Attack 1 keeps the game's original presentation. Lulu (`[炎宿せし宝石] ルルゥ`) remains excluded. Uninstall restores the cached, unmodified compatible APK with `adb install -r` and keeps downloaded transformation bundles by default.
